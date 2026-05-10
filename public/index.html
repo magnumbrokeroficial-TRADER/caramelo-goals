@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caramelo Goals — Detector de Padrões</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Bricolage+Grotesque:wght@400;500;600;700;800&display=swap');
+
+  :root {
+    --bg-deep: #000000;
+    --bg-panel: #0a0a0a;
+    --bg-elevated: #141414;
+    --border: #1f1f1f;
+    --border-light: #2a2a2a;
+    --text-primary: #e8ecf5;
+    --text-secondary: #8b95b1;
+    --text-muted: #5a6584;
+    --accent: #ffb547;
+    --green: #26c281;
+    --red: #ef4444;
+    --yellow: #facc15;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --white-line: #f0f0f0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Bricolage Grotesque', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 56px 1fr 32px;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 24px;
+  }
+
+  .logo { font-weight: 800; font-size: 18px; color: var(--accent); display: flex; align-items: center; gap: 8px; }
+  .logo-mark { width: 28px; height: 28px; background: var(--accent); border-radius: 6px; display: grid; place-items: center; color: var(--bg-deep); font-weight: 800; font-size: 16px; }
+  .markets { display: flex; gap: 4px; }
+  .market-btn { background: transparent; border: 1px solid transparent; color: var(--text-secondary); padding: 6px 12px; border-radius: 6px; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .market-btn:hover { color: var(--text-primary); background: var(--bg-elevated); }
+  .market-btn.active { background: var(--bg-elevated); border-color: var(--border-light); color: var(--accent); }
+  .header-spacer { flex: 1; }
+
+  .scan-badge {
+    background: linear-gradient(135deg, rgba(38, 194, 129, 0.15), rgba(168, 85, 247, 0.15));
+    border: 1px solid var(--green);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .scan-pulse {
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.3); }
+  }
+
+  /* MAIN GRID */
+  main {
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    overflow: hidden;
+  }
+
+  /* SIDEBAR LEFT: DETECTOR LOG */
+  .sidebar {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .sidebar-subtitle {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .signal-history { padding: 8px; flex: 1; }
+
+  .signal-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+
+  .signal-card:hover { border-color: var(--border-light); }
+
+  .signal-card.over { border-left-color: var(--green); }
+  .signal-card.under { border-left-color: var(--red); }
+  .signal-card.neutral { border-left-color: var(--text-muted); }
+
+  .signal-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .signal-pattern {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .signal-pattern.over { color: var(--green); }
+  .signal-pattern.under { color: var(--red); }
+  .signal-pattern.neutral { color: var(--text-secondary); }
+
+  .signal-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .signal-msg {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-bottom: 6px;
+  }
+
+  .signal-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+  }
+
+  .confidence-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-deep);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-right: 8px;
+  }
+
+  .confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 2px;
+  }
+
+  .confidence-text {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .market-tag {
+    background: var(--bg-deep);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-top: 6px;
+    display: inline-block;
+    border: 1px solid var(--border);
+  }
+
+  /* CHART AREA */
+  .chart-area { background: var(--bg-deep); display: flex; flex-direction: column; overflow: hidden; }
+  .chart-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .symbol-info { display: flex; align-items: center; gap: 14px; }
+  .symbol-name { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+  .symbol-sub { font-size: 12px; color: var(--text-secondary); padding-left: 14px; border-left: 1px solid var(--border); }
+  .last-value { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700; color: var(--white-line); }
+
+  .charts-container { flex: 1; display: grid; grid-template-rows: 2.5fr 1fr 1fr; overflow: hidden; }
+  .chart-block { position: relative; border-bottom: 1px solid var(--border); }
+  .chart-block:last-child { border-bottom: none; }
+
+  .chart-overlay-info {
+    position: absolute;
+    top: 8px; left: 12px;
+    z-index: 5;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .legend-dot { width: 10px; height: 2px; border-radius: 1px; }
+  .legend-label { color: var(--text-secondary); font-size: 10px; }
+  .legend-value { color: var(--text-primary); font-weight: 600; }
+
+  .chart-canvas { width: 100%; height: 100%; }
+
+  /* INFO PANEL RIGHT */
+  .info-panel {
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .panel-section { margin-bottom: 18px; }
+
+  .panel-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  /* CURRENT ALERT (BIG) */
+  .current-alert {
+    background: linear-gradient(135deg, rgba(38, 194, 129, 0.15), rgba(38, 194, 129, 0.02));
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    padding: 14px;
+  }
+
+  .alert-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .alert-pattern {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .alert-confidence {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--green);
+  }
+
+  .alert-desc {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
+  .alert-checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+  }
+
+  .check-icon {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    display: grid;
+    place-items: center;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .check-icon.passed { background: rgba(38, 194, 129, 0.2); color: var(--green); }
+  .check-icon.failed { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+  .check-icon.partial { background: rgba(250, 204, 21, 0.2); color: var(--yellow); }
+
+  .alert-recommendation {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+
+  .rec-tag {
+    background: var(--bg-deep);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+
+  /* INDICATORS */
+  .indicator-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .ind-label { color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .ind-value { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+
+  /* BACKTEST */
+  .backtest-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .bt-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+  }
+
+  .bt-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .bt-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+
+  .bt-value.green { color: var(--green); }
+  .bt-value.red { color: var(--red); }
+  .bt-value.yellow { color: var(--yellow); }
+
+  /* FOOTER */
+  footer { background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 20px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }
+  .status-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .footer-spacer { flex: 1; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-panel); }
+  ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">⚽</div>
+    <span>caramelo<span style="opacity:0.5">.goals</span></span>
+  </div>
+  <div class="markets">
+    <button class="market-btn active">🏆 Copa</button>
+    <button class="market-btn">🌍 Euro</button>
+    <button class="market-btn">💥 Super</button>
+    <button class="market-btn">🏴 Premier</button>
+  </div>
+  <div class="header-spacer"></div>
+  <div class="scan-badge">
+    <div class="scan-pulse"></div>
+    <span>SCANNER ATIVO · 6 padrões</span>
+  </div>
+</header>
+
+<main>
+  <!-- DETECTOR LOG -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">🎯 Histórico de Sinais</div>
+      <div class="sidebar-subtitle">Sinais detectados na sequência atual. Clique pra ver no gráfico.</div>
+    </div>
+    <div class="signal-history" id="signalHistory"></div>
+  </aside>
+
+  <!-- CHARTS -->
+  <section class="chart-area">
+    <div class="chart-header">
+      <div class="symbol-info">
+        <span class="symbol-name">⚽ Total Gols (FT)</span>
+        <span class="symbol-sub">Janela 20 · Copa</span>
+        <span class="last-value">52</span>
+      </div>
+    </div>
+
+    <div class="charts-container">
+      <div class="chart-block">
+        <div class="chart-overlay-info">
+          <div class="legend-item">
+            <div class="legend-dot" style="background:var(--white-line)"></div>
+            <span class="legend-label">Gols</span>
+            <span class="legend-value" id="legendGols">52</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:var(--yellow)"></div>
+            <span class="legend-label">MM9</span>
+            <span class="legend-value" id="legendMA9">--</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:var(--green)"></div>
+            <span class="legend-label">Sup</span>
+            <span class="legend-value" id="legendUpper">--</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:var(--red)"></div>
+            <span class="legend-label">Inf</span>
+            <span class="legend-value" id="legendLower">--</span>
+          </div>
+        </div>
+        <div id="mainChart" class="chart-canvas"></div>
+      </div>
+      <div class="chart-block">
+        <div class="chart-overlay-info">
+          <div class="legend-item">
+            <span class="legend-label">RSI (14)</span>
+            <span class="legend-value" id="legendRSI">--</span>
+          </div>
+        </div>
+        <div id="rsiChart" class="chart-canvas"></div>
+      </div>
+      <div class="chart-block">
+        <div class="chart-overlay-info">
+          <div class="legend-item">
+            <span class="legend-label">Momento (MM9-MM21)</span>
+            <span class="legend-value" id="legendMacd">--</span>
+          </div>
+        </div>
+        <div id="macdChart" class="chart-canvas"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALERT PANEL -->
+  <aside class="info-panel">
+    <div class="panel-section">
+      <div class="panel-section-title">⚡ Alerta Atual</div>
+      <div id="currentAlert"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">📊 Indicadores Agora</div>
+      <div id="indicatorPanel"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">🧪 Backtest (todos os sinais históricos)</div>
+      <div class="backtest-grid" id="backtestGrid"></div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <div class="status-dot"></div>
+  <span>SCANNER · 6 padrões ativos</span>
+  <span style="color:var(--text-secondary)">|</span>
+  <span id="footerSignalCount">0 sinais detectados</span>
+  <span style="color:var(--text-secondary)">|</span>
+  <span>Janela: 20 rodadas</span>
+  <div class="footer-spacer"></div>
+  <span style="color:var(--text-muted)">Lightweight Charts™ · Detector próprio</span>
+</footer>
+
+<script>
+/* ============================================================
+   ⚽ CARAMELO GOALS — DETECTOR DE PADRÕES
+   ============================================================
+   Esta é a engine que analisa a série de "total de gols na janela"
+   e dispara sinais quando padrões conhecidos aparecem.
+
+   FLUXO:
+   1. Indicadores → calcula RSI, Bandas, MMs, Momento
+   2. Detectores → cada um procura UM padrão específico
+   3. SignalEngine → junta tudo, classifica e ordena
+   4. UI → renderiza alertas, marcadores, backtest
+============================================================ */
+
+// ====== DADOS REAIS DO SEU GRÁFICO ======
+const realValues = [
+  43,44,44,46,46,42,40,41,45,46,42,43,45,47,51,54,50,49,52,51,
+  48,47,46,48,47,44,43,43,43,44,41,37,35,36,33,37,39,42,42,39,
+  42,40,42,43,44,44,47,51,50,52,56,55,55,49,48,45,44,46,48,49,
+  49,47,46,49,49,49,50,51,49,49,49,47,49,49,52,52
+];
+
+const startTime = new Date();
+startTime.setHours(20, 40, 0, 0);
+startTime.setDate(startTime.getDate() - 1);
+
+const data = realValues.map((v, i) => ({
+  time: Math.floor(startTime.getTime() / 1000) + i * 240,
+  value: v,
+  index: i,
+}));
+
+
+/* ============================================================
+   📐 INDICADORES TÉCNICOS
+============================================================ */
+
+// Média móvel simples
+function SMA(values, period) {
+  const result = new Array(values.length).fill(null);
+  for (let i = period - 1; i < values.length; i++) {
+    const slice = values.slice(i - period + 1, i + 1);
+    result[i] = slice.reduce((s, v) => s + v, 0) / period;
+  }
+  return result;
+}
+
+// Bandas (média ± k*desvio padrão)
+function bollingerBands(values, period = 20, k = 1.8) {
+  const upper = new Array(values.length).fill(null);
+  const middle = new Array(values.length).fill(null);
+  const lower = new Array(values.length).fill(null);
+
+  for (let i = period - 1; i < values.length; i++) {
+    const slice = values.slice(i - period + 1, i + 1);
+    const mean = slice.reduce((s, v) => s + v, 0) / period;
+    const variance = slice.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / period;
+    const std = Math.sqrt(variance);
+    upper[i] = mean + std * k;
+    middle[i] = mean;
+    lower[i] = mean - std * k;
+  }
+  return { upper, middle, lower };
+}
+
+// RSI clássico
+function RSI(values, period = 14) {
+  const result = new Array(values.length).fill(null);
+  if (values.length < period + 1) return result;
+
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = values[i] - values[i - 1];
+    if (diff >= 0) gains += diff; else losses -= diff;
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  result[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+
+  for (let i = period + 1; i < values.length; i++) {
+    const diff = values[i] - values[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    result[i] = 100 - 100 / (1 + rs);
+  }
+  return result;
+}
+
+// Momento = MM rápida - MM lenta (MACD adaptado)
+function momentum(values, fast = 9, slow = 21) {
+  const fastMA = SMA(values, fast);
+  const slowMA = SMA(values, slow);
+  return values.map((_, i) =>
+    (fastMA[i] !== null && slowMA[i] !== null) ? fastMA[i] - slowMA[i] : null
+  );
+}
+
+// Posição na banda (0 = banda inferior, 100 = banda superior)
+function bandPosition(value, lower, upper) {
+  if (lower === null || upper === null || upper === lower) return 50;
+  return ((value - lower) / (upper - lower)) * 100;
+}
+
+
+/* ============================================================
+   🎯 DETECTORES DE PADRÃO
+   Cada detector recebe o estado atual + histórico e retorna:
+   { active, confidence (0-100), pattern, message, market, checks }
+============================================================ */
+
+// 1️⃣ MEAN REVERSION (banda inf + RSI baixo + momentum virando)
+function detectMeanReversion(state, i) {
+  const { values, rsi, bands, mom } = state;
+  if (i < 25) return null;
+
+  const v = values[i];
+  const lower = bands.lower[i];
+  const upper = bands.upper[i];
+  const r = rsi[i];
+  const m = mom[i];
+  const mPrev = mom[i - 2];
+
+  if (lower === null || r === null || m === null) return null;
+
+  // Cada condição entra como "checagem"
+  const checks = [
+    {
+      name: `Valor próximo da banda inferior`,
+      passed: v <= lower * 1.05,
+      partial: v <= lower * 1.12,
+      detail: `${v} vs ${lower.toFixed(1)}`,
+    },
+    {
+      name: `RSI sobrevendido (<35)`,
+      passed: r < 35,
+      partial: r < 45,
+      detail: `RSI=${r.toFixed(1)}`,
+    },
+    {
+      name: `Momento virando pra cima`,
+      passed: m > mPrev && m > -1.5,
+      partial: m > mPrev,
+      detail: `${mPrev?.toFixed(2)} → ${m.toFixed(2)}`,
+    },
+  ];
+
+  const passed = checks.filter(c => c.passed).length;
+  const partial = checks.filter(c => c.partial && !c.passed).length;
+
+  if (passed === 0) return null;
+
+  const confidence = Math.min(100, passed * 30 + partial * 12);
+
+  return {
+    active: passed >= 2,
+    confidence,
+    pattern: 'MEAN REVERSION',
+    direction: 'over',
+    message: 'Sequência de poucos gols está esticada. Banda inferior tocada com RSI sobrevendido. Padrão histórico de retomada — próximas rodadas tendem a ter mais gols.',
+    market: ['Over 1.5 FT', 'Over 2.5 FT', 'Ambas Sim'],
+    checks,
+  };
+}
+
+// 2️⃣ TREND CONTINUATION (acima da MM, momento positivo, RSI saudável)
+function detectTrendContinuation(state, i) {
+  const { values, rsi, bands, mom } = state;
+  if (i < 25) return null;
+
+  const v = values[i];
+  const middle = bands.middle[i];
+  const r = rsi[i];
+  const m = mom[i];
+
+  if (middle === null || r === null || m === null) return null;
+
+  const checks = [
+    {
+      name: `Acima da média da janela`,
+      passed: v > middle,
+      partial: v > middle * 0.98,
+      detail: `${v} vs ${middle.toFixed(1)}`,
+    },
+    {
+      name: `Momento positivo`,
+      passed: m > 0.5,
+      partial: m > 0,
+      detail: `Mom=${m.toFixed(2)}`,
+    },
+    {
+      name: `RSI saudável (50-70)`,
+      passed: r > 50 && r < 70,
+      partial: r > 45 && r < 75,
+      detail: `RSI=${r.toFixed(1)}`,
+    },
+  ];
+
+  const passed = checks.filter(c => c.passed).length;
+  const partial = checks.filter(c => c.partial && !c.passed).length;
+
+  if (passed < 2) return null;
+
+  const confidence = Math.min(100, passed * 28 + partial * 10);
+
+  return {
+    active: passed >= 2,
+    confidence,
+    pattern: 'TENDÊNCIA SAUDÁVEL',
+    direction: 'over',
+    message: 'Sequência em alta com momento confirmado. RSI ainda não saturou — espaço pra continuar subindo.',
+    market: ['Over 2.5 FT', 'Over 3.5 FT'],
+    checks,
+  };
+}
+
+// 3️⃣ TOP REVERSAL (banda sup + RSI alto + momento caindo)
+function detectTopReversal(state, i) {
+  const { values, rsi, bands, mom } = state;
+  if (i < 25) return null;
+
+  const v = values[i];
+  const upper = bands.upper[i];
+  const r = rsi[i];
+  const m = mom[i];
+  const mPrev = mom[i - 2];
+
+  if (upper === null || r === null || m === null) return null;
+
+  const checks = [
+    {
+      name: `Valor próximo da banda superior`,
+      passed: v >= upper * 0.97,
+      partial: v >= upper * 0.93,
+      detail: `${v} vs ${upper.toFixed(1)}`,
+    },
+    {
+      name: `RSI sobrecomprado (>68)`,
+      passed: r > 68,
+      partial: r > 60,
+      detail: `RSI=${r.toFixed(1)}`,
+    },
+    {
+      name: `Momento desacelerando`,
+      passed: mPrev !== null && m < mPrev,
+      partial: false,
+      detail: `${mPrev?.toFixed(2)} → ${m.toFixed(2)}`,
+    },
+  ];
+
+  const passed = checks.filter(c => c.passed).length;
+  const partial = checks.filter(c => c.partial && !c.passed).length;
+
+  if (passed < 2) return null;
+
+  const confidence = Math.min(100, passed * 30 + partial * 10);
+
+  return {
+    active: passed >= 2,
+    confidence,
+    pattern: 'TOPO ESGOTADO',
+    direction: 'under',
+    message: 'Sequência de muitos gols está saturada. Banda superior + RSI alto + momento perdendo força. Tendência de correção pra baixo.',
+    market: ['Under 2.5 FT', 'Under 3.5 FT'],
+    checks,
+  };
+}
+
+// 4️⃣ BREAKOUT DE COMPRESSÃO (bandas estreitas + expansão súbita)
+function detectSqueezeBreakout(state, i) {
+  const { values, bands, mom } = state;
+  if (i < 30) return null;
+
+  // largura atual
+  const widthNow = bands.upper[i] - bands.lower[i];
+  // largura média das últimas 10 rodadas (excluindo as 3 mais recentes)
+  let avgWidth = 0;
+  let count = 0;
+  for (let k = i - 12; k <= i - 4; k++) {
+    if (bands.upper[k] !== null && bands.lower[k] !== null) {
+      avgWidth += bands.upper[k] - bands.lower[k];
+      count++;
+    }
+  }
+  if (count === 0) return null;
+  avgWidth /= count;
+
+  const m = mom[i];
+  if (m === null || widthNow === null) return null;
+
+  // Squeeze prévio: últimas 5-12 rodadas tinham largura menor que média histórica
+  let squeezeStrength = 0;
+  for (let k = i - 8; k <= i - 3; k++) {
+    if (bands.upper[k] !== null) {
+      const w = bands.upper[k] - bands.lower[k];
+      if (w < avgWidth * 0.85) squeezeStrength++;
+    }
+  }
+
+  const checks = [
+    {
+      name: `Compressão prévia (${squeezeStrength}/6 rodadas)`,
+      passed: squeezeStrength >= 4,
+      partial: squeezeStrength >= 2,
+      detail: `Largura média ${avgWidth.toFixed(1)}`,
+    },
+    {
+      name: `Expansão atual da banda`,
+      passed: widthNow > avgWidth * 1.05,
+      partial: widthNow > avgWidth,
+      detail: `Atual ${widthNow.toFixed(1)}`,
+    },
+    {
+      name: `Direção do momento clara`,
+      passed: Math.abs(m) > 1,
+      partial: Math.abs(m) > 0.4,
+      detail: `Mom=${m.toFixed(2)}`,
+    },
+  ];
+
+  const passed = checks.filter(c => c.passed).length;
+  if (passed < 2) return null;
+
+  const direction = m > 0 ? 'over' : 'under';
+  const confidence = Math.min(100, passed * 25 + 15);
+
+  return {
+    active: passed >= 2,
+    confidence,
+    pattern: 'BREAKOUT DE COMPRESSÃO',
+    direction,
+    message: `Bandas se comprimiram nas últimas rodadas e agora abrem com força. Movimento direcional ${direction === 'over' ? 'pra mais gols' : 'pra menos gols'} provável.`,
+    market: direction === 'over' ? ['Over 2.5 FT', 'Ambas Sim'] : ['Under 2.5 FT'],
+    checks,
+  };
+}
+
+// 5️⃣ DIVERGÊNCIA BAIXISTA (gols subindo mas momento caindo)
+function detectBearishDivergence(state, i) {
+  const { values, mom } = state;
+  if (i < 30) return null;
+
+  // pega último topo de valor e último topo anterior
+  const window = 15;
+  let recentMax = -Infinity, recentMaxIdx = -1;
+  let prevMax = -Infinity, prevMaxIdx = -1;
+
+  for (let k = i - 5; k <= i; k++) {
+    if (values[k] > recentMax) { recentMax = values[k]; recentMaxIdx = k; }
+  }
+  for (let k = i - window; k < i - 5; k++) {
+    if (values[k] > prevMax) { prevMax = values[k]; prevMaxIdx = k; }
+  }
+
+  if (recentMaxIdx < 0 || prevMaxIdx < 0) return null;
+
+  const recentMom = mom[recentMaxIdx];
+  const prevMom = mom[prevMaxIdx];
+  if (recentMom === null || prevMom === null) return null;
+
+  // Divergência: novo topo no valor MAS momento mais fraco que antes
+  const valueHigher = recentMax > prevMax;
+  const momLower = recentMom < prevMom;
+
+  if (!valueHigher || !momLower) return null;
+
+  const valueGap = recentMax - prevMax;
+  const momGap = prevMom - recentMom;
+  const confidence = Math.min(100, 40 + valueGap * 5 + momGap * 8);
+
+  return {
+    active: true,
+    confidence,
+    pattern: 'DIVERGÊNCIA BAIXISTA',
+    direction: 'under',
+    message: 'Sequência fez novo pico de gols, mas o momento foi mais fraco que no topo anterior. Sinal clássico de exaustão antes da reversão.',
+    market: ['Under 2.5 FT'],
+    checks: [
+      { name: `Topo atual maior`, passed: true, detail: `${recentMax} > ${prevMax}` },
+      { name: `Momento atual mais fraco`, passed: true, detail: `${recentMom.toFixed(2)} < ${prevMom.toFixed(2)}` },
+    ],
+  };
+}
+
+// 6️⃣ DIVERGÊNCIA ALTISTA (gols caindo mas momento subindo)
+function detectBullishDivergence(state, i) {
+  const { values, mom } = state;
+  if (i < 30) return null;
+
+  const window = 15;
+  let recentMin = Infinity, recentMinIdx = -1;
+  let prevMin = Infinity, prevMinIdx = -1;
+
+  for (let k = i - 5; k <= i; k++) {
+    if (values[k] < recentMin) { recentMin = values[k]; recentMinIdx = k; }
+  }
+  for (let k = i - window; k < i - 5; k++) {
+    if (values[k] < prevMin) { prevMin = values[k]; prevMinIdx = k; }
+  }
+
+  if (recentMinIdx < 0 || prevMinIdx < 0) return null;
+
+  const recentMom = mom[recentMinIdx];
+  const prevMom = mom[prevMinIdx];
+  if (recentMom === null || prevMom === null) return null;
+
+  const valueLower = recentMin < prevMin;
+  const momHigher = recentMom > prevMom;
+
+  if (!valueLower || !momHigher) return null;
+
+  const valueGap = prevMin - recentMin;
+  const momGap = recentMom - prevMom;
+  const confidence = Math.min(100, 40 + valueGap * 5 + momGap * 8);
+
+  return {
+    active: true,
+    confidence,
+    pattern: 'DIVERGÊNCIA ALTISTA',
+    direction: 'over',
+    message: 'Sequência fez novo fundo de gols, mas o momento foi mais forte que no fundo anterior. Sinal clássico de reversão pra cima.',
+    market: ['Over 2.5 FT', 'Ambas Sim'],
+    checks: [
+      { name: `Fundo atual menor`, passed: true, detail: `${recentMin} < ${prevMin}` },
+      { name: `Momento atual mais forte`, passed: true, detail: `${recentMom.toFixed(2)} > ${prevMom.toFixed(2)}` },
+    ],
+  };
+}
+
+const DETECTORS = [
+  detectMeanReversion,
+  detectTrendContinuation,
+  detectTopReversal,
+  detectSqueezeBreakout,
+  detectBearishDivergence,
+  detectBullishDivergence,
+];
+
+
+/* ============================================================
+   🧠 SIGNAL ENGINE — orquestra os detectores
+============================================================ */
+
+function buildState() {
+  const values = data.map(d => d.value);
+  return {
+    values,
+    rsi: RSI(values, 14),
+    bands: bollingerBands(values, 20, 1.8),
+    mom: momentum(values, 9, 21),
+    mm9: SMA(values, 9),
+    mm21: SMA(values, 21),
+  };
+}
+
+function scanAll(state) {
+  const allSignals = [];
+  for (let i = 25; i < state.values.length; i++) {
+    for (const detector of DETECTORS) {
+      const result = detector(state, i);
+      if (result && result.active && result.confidence >= 35) {
+        allSignals.push({
+          ...result,
+          time: data[i].time,
+          dataIndex: i,
+          value: state.values[i],
+        });
+      }
+    }
+  }
+  // Ordena por tempo descendente (mais recentes primeiro)
+  return allSignals.sort((a, b) => b.dataIndex - a.dataIndex);
+}
+
+
+/* ============================================================
+   🧪 BACKTEST — verifica se o sinal teria acertado
+   Regra simples: olha as próximas 3 rodadas após o sinal
+   - Sinal "over": acerta se a média das próximas 3 > valor no momento
+   - Sinal "under": acerta se a média das próximas 3 < valor no momento
+============================================================ */
+
+function backtest(signals, values) {
+  let wins = 0, losses = 0;
+  const horizon = 3;
+
+  signals.forEach(sig => {
+    const i = sig.dataIndex;
+    if (i + horizon >= values.length) return;
+    const baseline = values[i];
+    let futureSum = 0;
+    for (let k = 1; k <= horizon; k++) futureSum += values[i + k];
+    const futureAvg = futureSum / horizon;
+
+    const won = sig.direction === 'over' ? futureAvg > baseline : futureAvg < baseline;
+    sig.backtestResult = won ? 'win' : 'loss';
+    if (won) wins++; else losses++;
+  });
+
+  const total = wins + losses;
+  return {
+    total,
+    wins,
+    losses,
+    accuracy: total > 0 ? (wins / total) * 100 : 0,
+  };
+}
+
+
+/* ============================================================
+   🎨 RENDERIZAÇÃO
+============================================================ */
+
+const state = buildState();
+const allSignals = scanAll(state);
+const btResults = backtest(allSignals, state.values);
+
+// Pega o sinal mais recente como "alerta atual"
+const currentSignal = allSignals[0];
+
+// ====== GRÁFICO PRINCIPAL ======
+const chartCommon = {
+  layout: {
+    background: { type: 'solid', color: '#000000' },
+    textColor: '#facc15',
+    fontFamily: 'JetBrains Mono, monospace',
+    fontSize: 11,
+  },
+  grid: { vertLines: { color: 'rgba(31,31,31,0.5)' }, horzLines: { color: 'rgba(31,31,31,0.5)' } },
+  crosshair: {
+    mode: 1,
+    vertLine: { color: '#ffb547', width: 1, style: 2 },
+    horzLine: { color: '#ffb547', width: 1, style: 2 },
+  },
+  rightPriceScale: { borderColor: '#1f1f1f' },
+  timeScale: { borderColor: '#1f1f1f', timeVisible: true, secondsVisible: false },
+};
+
+const mainEl = document.getElementById('mainChart');
+const mainChart = LightweightCharts.createChart(mainEl, {
+  ...chartCommon, width: mainEl.clientWidth, height: mainEl.clientHeight,
+});
+
+// Bandas
+const upperSeries = mainChart.addLineSeries({ color: 'rgba(38,194,129,0.7)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+upperSeries.setData(state.bands.upper.map((v, i) => v !== null ? { time: data[i].time, value: v } : null).filter(Boolean));
+
+const middleSeries = mainChart.addLineSeries({ color: 'rgba(38,194,129,0.3)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+middleSeries.setData(state.bands.middle.map((v, i) => v !== null ? { time: data[i].time, value: v } : null).filter(Boolean));
+
+const lowerSeries = mainChart.addLineSeries({ color: 'rgba(239,68,68,0.7)', lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false });
+lowerSeries.setData(state.bands.lower.map((v, i) => v !== null ? { time: data[i].time, value: v } : null).filter(Boolean));
+
+// MM9
+const ma9Series = mainChart.addLineSeries({ color: '#facc15', lineWidth: 2, priceLineVisible: false });
+ma9Series.setData(state.mm9.map((v, i) => v !== null ? { time: data[i].time, value: v } : null).filter(Boolean));
+
+// Linha principal
+const goalsSeries = mainChart.addLineSeries({
+  color: '#f0f0f0', lineWidth: 2,
+  priceLineColor: '#ffb547', priceLineStyle: 2,
+  crosshairMarkerVisible: true, crosshairMarkerRadius: 4,
+});
+goalsSeries.setData(data);
+
+// 🚩 MARCADORES dos sinais no gráfico principal
+const markers = allSignals.map(sig => ({
+  time: sig.time,
+  position: sig.direction === 'over' ? 'belowBar' : 'aboveBar',
+  color: sig.direction === 'over' ? '#26c281' : '#ef4444',
+  shape: sig.direction === 'over' ? 'arrowUp' : 'arrowDown',
+  text: sig.pattern.split(' ')[0],
+  size: 1,
+})).reverse();
+goalsSeries.setMarkers(markers);
+
+// ====== RSI CHART ======
+const rsiEl = document.getElementById('rsiChart');
+const rsiChart = LightweightCharts.createChart(rsiEl, {
+  ...chartCommon, width: rsiEl.clientWidth, height: rsiEl.clientHeight,
+});
+const rsiSeries = rsiChart.addLineSeries({ color: '#a855f7', lineWidth: 2 });
+rsiSeries.setData(state.rsi.map((v, i) => v !== null ? { time: data[i].time, value: v } : null).filter(Boolean));
+rsiSeries.createPriceLine({ price: 70, color: 'rgba(239,68,68,0.5)', lineWidth: 1, lineStyle: 2, axisLabelVisible: true });
+rsiSeries.createPriceLine({ price: 30, color: 'rgba(38,194,129,0.5)', lineWidth: 1, lineStyle: 2, axisLabelVisible: true });
+rsiSeries.createPriceLine({ price: 50, color: 'rgba(139,149,177,0.3)', lineWidth: 1, lineStyle: 1, axisLabelVisible: false });
+
+// ====== MACD/Momento CHART ======
+const macdEl = document.getElementById('macdChart');
+const macdChart = LightweightCharts.createChart(macdEl, {
+  ...chartCommon, width: macdEl.clientWidth, height: macdEl.clientHeight,
+});
+const macdSeries = macdChart.addHistogramSeries({ priceFormat: { type: 'price', precision: 2, minMove: 0.01 } });
+macdSeries.setData(state.mom.map((v, i) =>
+  v !== null ? {
+    time: data[i].time,
+    value: parseFloat(v.toFixed(2)),
+    color: v >= 0 ? 'rgba(38,194,129,0.85)' : 'rgba(239,68,68,0.85)'
+  } : null
+).filter(Boolean));
+macdSeries.createPriceLine({ price: 0, color: '#444', lineWidth: 1, lineStyle: 0, axisLabelVisible: false });
+
+// Sincroniza
+function syncCharts(charts) {
+  charts.forEach((chart, i) => {
+    chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      charts.forEach((other, j) => {
+        if (i !== j && range) other.timeScale().setVisibleLogicalRange(range);
+      });
+    });
+  });
+}
+syncCharts([mainChart, rsiChart, macdChart]);
+
+
+/* ============================================================
+   🧾 PAINÉIS LATERAIS
+============================================================ */
+
+// Alerta atual
+function renderCurrentAlert() {
+  const el = document.getElementById('currentAlert');
+  if (!currentSignal) {
+    el.innerHTML = `<div style="padding:14px; background:var(--bg-elevated); border-radius:8px; color:var(--text-muted); font-size:12px; text-align:center">⏸ Sem padrão claro no momento. Aguardando próxima rodada.</div>`;
+    return;
+  }
+
+  const dirColor = currentSignal.direction === 'over' ? 'var(--green)' : 'var(--red)';
+  const arrow = currentSignal.direction === 'over' ? '⬆️' : '⬇️';
+
+  el.innerHTML = `
+    <div class="current-alert" style="background:linear-gradient(135deg, ${dirColor}22, ${dirColor}05); border-color:${dirColor}">
+      <div class="alert-header">
+        <div class="alert-pattern" style="color:${dirColor}">${arrow} ${currentSignal.pattern}</div>
+        <div class="alert-confidence" style="color:${dirColor}">${currentSignal.confidence.toFixed(0)}%</div>
+      </div>
+      <div class="alert-desc">${currentSignal.message}</div>
+      <div class="alert-checklist">
+        ${currentSignal.checks.map(c => `
+          <div class="checklist-item">
+            <span class="check-icon ${c.passed ? 'passed' : (c.partial ? 'partial' : 'failed')}">
+              ${c.passed ? '✓' : (c.partial ? '~' : '✗')}
+            </span>
+            <span>${c.name}</span>
+            <span style="color:var(--text-muted); margin-left:auto">${c.detail || ''}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="alert-recommendation">
+        ${currentSignal.market.map(m => `<span class="rec-tag">${m}</span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// Indicadores agora
+function renderIndicators() {
+  const el = document.getElementById('indicatorPanel');
+  const i = state.values.length - 1;
+  const r = state.rsi[i];
+  const m = state.mom[i];
+  const pos = bandPosition(state.values[i], state.bands.lower[i], state.bands.upper[i]);
+
+  const rsiColor = r > 70 ? 'var(--red)' : (r < 30 ? 'var(--green)' : 'var(--yellow)');
+  const momColor = m > 0 ? 'var(--green)' : 'var(--red)';
+  const posColor = pos > 75 ? 'var(--red)' : (pos < 25 ? 'var(--green)' : 'var(--yellow)');
+
+  el.innerHTML = `
+    <div class="indicator-row">
+      <span class="ind-label">📊 Total atual</span>
+      <span class="ind-value" style="color:var(--white-line)">${state.values[i]}</span>
+    </div>
+    <div class="indicator-row">
+      <span class="ind-label">📈 RSI (14)</span>
+      <span class="ind-value" style="color:${rsiColor}">${r?.toFixed(1) || '--'}</span>
+    </div>
+    <div class="indicator-row">
+      <span class="ind-label">⚡ Momento</span>
+      <span class="ind-value" style="color:${momColor}">${m > 0 ? '+' : ''}${m?.toFixed(2) || '--'}</span>
+    </div>
+    <div class="indicator-row">
+      <span class="ind-label">📍 Posição na banda</span>
+      <span class="ind-value" style="color:${posColor}">${pos.toFixed(0)}%</span>
+    </div>
+    <div class="indicator-row">
+      <span class="ind-label">📏 MM9 / MM21</span>
+      <span class="ind-value">${state.mm9[i]?.toFixed(1) || '--'} / ${state.mm21[i]?.toFixed(1) || '--'}</span>
+    </div>
+  `;
+}
+
+// Histórico de sinais
+function renderSignalHistory() {
+  const el = document.getElementById('signalHistory');
+  if (allSignals.length === 0) {
+    el.innerHTML = `<div style="padding:20px; color:var(--text-muted); font-size:12px; text-align:center">Nenhum sinal detectado.</div>`;
+    return;
+  }
+
+  el.innerHTML = allSignals.slice(0, 30).map(sig => {
+    const d = new Date(sig.time * 1000);
+    const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dirClass = sig.direction === 'over' ? 'over' : 'under';
+    const resultIcon = sig.backtestResult === 'win' ? '✅' : (sig.backtestResult === 'loss' ? '❌' : '⏳');
+
+    return `
+      <div class="signal-card ${dirClass}" data-time="${sig.time}">
+        <div class="signal-card-top">
+          <span class="signal-pattern ${dirClass}">${sig.pattern}</span>
+          <span class="signal-time">${timeStr} ${resultIcon}</span>
+        </div>
+        <div class="signal-msg">Valor: <strong>${sig.value}</strong> · ${sig.checks.filter(c => c.passed).length}/${sig.checks.length} condições</div>
+        <div class="signal-meta">
+          <div class="confidence-bar">
+            <div class="confidence-fill" style="width:${sig.confidence}%"></div>
+          </div>
+          <span class="confidence-text">${sig.confidence.toFixed(0)}%</span>
+        </div>
+        <span class="market-tag">${sig.market[0]}</span>
+      </div>
+    `;
+  }).join('');
+
+  // Ao clicar, posiciona o gráfico no momento do sinal
+  el.querySelectorAll('.signal-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const time = parseInt(card.dataset.time);
+      mainChart.timeScale().scrollToPosition(0, false);
+      // pequeno hack: foca em uma janela ao redor do tempo
+    });
+  });
+}
+
+// Backtest results
+function renderBacktest() {
+  const el = document.getElementById('backtestGrid');
+  const overSignals = allSignals.filter(s => s.direction === 'over');
+  const underSignals = allSignals.filter(s => s.direction === 'under');
+  const overWins = overSignals.filter(s => s.backtestResult === 'win').length;
+  const underWins = underSignals.filter(s => s.backtestResult === 'win').length;
+  const overAcc = overSignals.length > 0 ? (overWins / overSignals.length) * 100 : 0;
+  const underAcc = underSignals.length > 0 ? (underWins / underSignals.length) * 100 : 0;
+
+  el.innerHTML = `
+    <div class="bt-card">
+      <div class="bt-label">Sinais Total</div>
+      <div class="bt-value">${btResults.total}</div>
+    </div>
+    <div class="bt-card">
+      <div class="bt-label">Acerto Geral</div>
+      <div class="bt-value ${btResults.accuracy >= 60 ? 'green' : (btResults.accuracy >= 50 ? 'yellow' : 'red')}">${btResults.accuracy.toFixed(0)}%</div>
+    </div>
+    <div class="bt-card">
+      <div class="bt-label">Sinais Over</div>
+      <div class="bt-value green">${overSignals.length}</div>
+    </div>
+    <div class="bt-card">
+      <div class="bt-label">Acerto Over</div>
+      <div class="bt-value ${overAcc >= 60 ? 'green' : 'yellow'}">${overAcc.toFixed(0)}%</div>
+    </div>
+    <div class="bt-card">
+      <div class="bt-label">Sinais Under</div>
+      <div class="bt-value red">${underSignals.length}</div>
+    </div>
+    <div class="bt-card">
+      <div class="bt-label">Acerto Under</div>
+      <div class="bt-value ${underAcc >= 60 ? 'green' : 'yellow'}">${underAcc.toFixed(0)}%</div>
+    </div>
+  `;
+}
+
+// Legendas
+function renderLegends() {
+  const i = state.values.length - 1;
+  document.getElementById('legendGols').textContent = state.values[i];
+  document.getElementById('legendMA9').textContent = state.mm9[i]?.toFixed(1) || '--';
+  document.getElementById('legendUpper').textContent = state.bands.upper[i]?.toFixed(1) || '--';
+  document.getElementById('legendLower').textContent = state.bands.lower[i]?.toFixed(1) || '--';
+  document.getElementById('legendRSI').textContent = state.rsi[i]?.toFixed(1) || '--';
+  document.getElementById('legendMacd').textContent = (state.mom[i] >= 0 ? '+' : '') + (state.mom[i]?.toFixed(2) || '--');
+  document.getElementById('footerSignalCount').textContent = `${allSignals.length} sinais detectados`;
+}
+
+renderCurrentAlert();
+renderIndicators();
+renderSignalHistory();
+renderBacktest();
+renderLegends();
+
+// Resize
+function resize() {
+  mainChart.applyOptions({ width: mainEl.clientWidth, height: mainEl.clientHeight });
+  rsiChart.applyOptions({ width: rsiEl.clientWidth, height: rsiEl.clientHeight });
+  macdChart.applyOptions({ width: macdEl.clientWidth, height: macdEl.clientHeight });
+}
+window.addEventListener('resize', resize);
+setTimeout(() => { resize(); mainChart.timeScale().fitContent(); rsiChart.timeScale().fitContent(); macdChart.timeScale().fitContent(); }, 200);
+</script>
+
+</body>
+</html>
