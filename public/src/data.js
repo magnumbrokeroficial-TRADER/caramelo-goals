@@ -29,6 +29,9 @@ const MOCK_VALUES = [
   49,47,46,49,49,49,50,51,49,49,49,47,49,49,52,52
 ];
 
+let lastIdx = MOCK_VALUES.length - 1;
+const TOTAL_ROUNDS_24H = 24;
+
 function formatChartData(valores) {
   const now = Math.floor(Date.now() / 1000);
   return valores.map((v, i) => ({
@@ -39,6 +42,7 @@ function formatChartData(valores) {
 
 function loadMarket(marketKey) {
   const valores = (window.__dadosReais && window.__dadosReais.length > 0) ? window.__dadosReais : MOCK_VALUES;
+  lastIdx = valores.length - 1;
   return { key: marketKey, name: MARKETS[marketKey]?.name || marketKey, data: formatChartData(valores) };
 }
 
@@ -89,8 +93,7 @@ function generate24hHistory(rule) {
 fetchLiveData().then(data => {
   if (data && data.serie_over25 && data.serie_over25.length > 0) {
     window.__dadosReais = data.serie_over25;
+    lastIdx = data.serie_over25.length - 1;
     console.log('✅ Dados reais carregados:', data.serie_over25.length, 'pontos');
   }
 });
-
-const TOTAL_ROUNDS_24H = 24;
