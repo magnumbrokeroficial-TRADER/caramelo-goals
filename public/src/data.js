@@ -92,3 +92,5 @@ fetchLiveData().then(data => {
     console.log('✅ Dados reais carregados:', data.serie_over25.length, 'pontos');
   }
 });
+
+const TOTAL_ROUNDS_24H = 24;
