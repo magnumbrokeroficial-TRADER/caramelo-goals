@@ -70,3 +70,23 @@ fetchLiveData().then(data => {
     console.log('✅ Dados reais carregados:', data.serie_over25.length, 'pontos');
   }
 });
+
+function generate24hHistory(rule) {
+  const hours = [];
+  for (let h = 0; h < 24; h++) {
+    const hg = Math.floor(Math.random() * 5);
+    const ag = Math.floor(Math.random() * 4);
+    const total = hg + ag;
+    let passes = false;
+    switch (rule) {
+      case 'over25': passes = total > 2.5; break;
+      case 'over15': passes = total > 1.5; break;
+      case 'over35': passes = total > 3.5; break;
+      case 'under25': passes = total <= 2.5; break;
+      case 'btts': passes = hg > 0 && ag > 0; break;
+      default: passes = total > 2.5;
+    }
+    hours.push({ hour: `${String(h).padStart(2,'0')}:00`, home: hg, away: ag, total, passes });
+  }
+  return hours;
+}
