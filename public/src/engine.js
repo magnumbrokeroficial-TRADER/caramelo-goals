@@ -10,8 +10,14 @@
 function scanAllPatterns(state, data, minConfidence = 35) {
   const allSignals = [];
 
+  // Combina detectores tradicionais + score predictors
+  const allDetectors = [
+    ...DETECTORS,
+    ...(typeof SCORE_PREDICTORS !== 'undefined' ? SCORE_PREDICTORS : []),
+  ];
+
   for (let i = 25; i < state.values.length; i++) {
-    for (const detector of DETECTORS) {
+    for (const detector of allDetectors) {
       const result = detector(state, i);
       if (result && result.active && result.confidence >= minConfidence) {
         allSignals.push({
@@ -40,37 +46,35 @@ function scanAllPatterns(state, data, minConfidence = 35) {
 function dedupeSignals(signals, minSpacing = 4, topN = 25) {
   if (!signals || signals.length === 0) return [];
 
-  // Ordena por dataIndex crescente (cronológico) pra agrupar
+  // Ordena cronologicamente
   const chrono = [...signals].sort((a, b) => a.dataIndex - b.dataIndex);
 
   const kept = [];
-  let lastKeptIdx = -Infinity;
-  let bestInWindow = null;
+  let windowStart = chrono[0].dataIndex;
+  let bestInWindow = chrono[0];
 
-  for (const sig of chrono) {
-    if (sig.dataIndex - lastKeptIdx >= minSpacing) {
-      // Fechou janela anterior — fixa o melhor candidato dela
-      if (bestInWindow) kept.push(bestInWindow);
+  for (let i = 1; i < chrono.length; i++) {
+    const sig = chrono[i];
+    if (sig.dataIndex - windowStart >= minSpacing) {
+      // Fecha janela atual, abre uma nova começando neste sinal
+      kept.push(bestInWindow);
+      windowStart = sig.dataIndex;
       bestInWindow = sig;
-      lastKeptIdx = sig.dataIndex;
     } else {
-      // Mesma janela — guarda o de maior confiança
-      if (!bestInWindow || sig.confidence > bestInWindow.confidence) {
+      // Ainda na mesma janela: mantém o de maior confiança
+      if (sig.confidence > bestInWindow.confidence) {
         bestInWindow = sig;
       }
-      lastKeptIdx = sig.dataIndex;
     }
   }
-  if (bestInWindow) kept.push(bestInWindow);
+  // Não esquece a última janela aberta
+  kept.push(bestInWindow);
 
-  // Aplica limite absoluto: pega os topN com maior confiança
-  const filtered = kept
+  // Aplica limite global: pega os topN de maior confiança
+  return kept
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, topN)
-    // E reordena cronologicamente reverso pra render no histórico
     .sort((a, b) => b.dataIndex - a.dataIndex);
-
-  return filtered;
 }
 
 /* ============================================================
@@ -97,9 +101,20 @@ function backtestSignals(signals, values, horizon = 3) {
     for (let k = 1; k <= horizon; k++) futureSum += values[i + k];
     const futureAvg = futureSum / horizon;
 
-    const won = sig.direction === 'over'
-      ? futureAvg > baseline
-      : futureAvg < baseline;
+    let won;
+    // Backtest customizado para padrões específicos
+    if (sig.backtestType === 'sustainHighLevel') {
+      // Para BIG ODDS / Over: sucesso é manter o nível alto nas próximas rodadas
+      const threshold = sig.sustainThreshold || 50;
+      won = futureAvg >= threshold;
+    } else if (sig.backtestType === 'sustainLowLevel') {
+      // Para 0x0 / Under: sucesso é manter o nível baixo nas próximas rodadas
+      const threshold = sig.sustainThreshold || 45;
+      won = futureAvg <= threshold;
+    } else {
+      // Backtest direcional padrão
+      won = sig.direction === 'over' ? futureAvg > baseline : futureAvg < baseline;
+    }
 
     sig.backtestResult = won ? 'win' : 'loss';
     if (won) wins++; else losses++;
@@ -132,4 +147,69 @@ function backtestByPattern(signals) {
   });
 
   return byPattern;
+}
+
+/* ============================================================
+   🎯 FILTRO POR ACURÁCIA (max 40% erro)
+   ============================================================
+   Roda backtest individual de cada padrão, calcula taxa de
+   acerto, e retorna apenas sinais de padrões com accuracy
+   >= minAccuracy (default 60%).
+============================================================ */
+
+function filterByAccuracy(signals, values, horizon = 3, minAccuracy = 60) {
+  if (!signals.length) return { filtered: [], stats: {} };
+
+  // Backtest temporário só pra calcular accuracy por padrão
+  const tempSignals = signals.map(s => ({ ...s }));
+  backtestSignals(tempSignals, values, horizon);
+  const byPattern = backtestByPattern(tempSignals);
+
+  // Padrões aprovados (accuracy >= threshold E pelo menos 3 amostras)
+  const approved = new Set();
+  Object.entries(byPattern).forEach(([pattern, stats]) => {
+    if (stats.total >= 3 && stats.accuracy >= minAccuracy) {
+      approved.add(pattern);
+    }
+  });
+
+  return {
+    filtered: signals.filter(s => approved.has(s.pattern)),
+    stats: byPattern,
+    approvedPatterns: Array.from(approved),
+  };
+}
+
+/* ============================================================
+   🤖 AUTO-SELEÇÃO DO MELHOR GRUPO DE DETECTORES
+   ============================================================
+   Roda backtest de TODOS os detectores e retorna os topN
+   com maior accuracy. Útil pra automaticamente "calibrar"
+   quais detectores usar baseado no histórico real.
+============================================================ */
+
+function autoSelectBestDetectors(state, data, options = {}) {
+  const {
+    topN = 5,
+    minSamples = 3,
+    horizon = 3,
+    minConfidence = 35,
+  } = options;
+
+  const allSignals = scanAllPatterns(state, data, minConfidence);
+  const tempSignals = allSignals.map(s => ({ ...s }));
+  backtestSignals(tempSignals, state.values, horizon);
+  const stats = backtestByPattern(tempSignals);
+
+  // Ranqueia padrões por accuracy (mas só os com amostras suficientes)
+  const ranked = Object.entries(stats)
+    .filter(([_, s]) => s.total >= minSamples)
+    .map(([pattern, s]) => ({ pattern, ...s }))
+    .sort((a, b) => b.accuracy - a.accuracy);
+
+  return {
+    top: ranked.slice(0, topN).map(r => r.pattern),
+    rankings: ranked,
+    allStats: stats,
+  };
 }

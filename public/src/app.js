@@ -46,22 +46,53 @@ function loadAndRender(marketKey) {
   const values = App.data.map(d => d.value);
   App.state = calculateAllIndicators(values, cfg);
 
-  // 1. Detecta TODOS os sinais brutos
-  const rawSignals = scanAllPatterns(App.state, App.data, cfg.minConfidence);
-
-  // 2. Aplica dedupe pra reduzir poluição visual
-  App.signals = dedupeSignals(rawSignals, cfg.signalSpacing || 4, cfg.maxMarkers || 25);
-  App.rawSignalCount = rawSignals.length;
-
-  App.btResults = backtestSignals(App.signals, values, cfg.backtestHorizon);
-
-  // 3. Calcula trendlines + zonas S/R
+  // 1. Calcula trendlines + zonas S/R PRIMEIRO (detectores S/R precisam disso)
   App.trendData = computeTrendlinesAndZones(values, {
     macroSwingBars: cfg.macroSwingBars || 12,
     microSwingBars: cfg.microSwingBars || 4,
     srTolerance: cfg.srTolerance || 2.5,
     srMinTouches: cfg.srMinTouches || 3,
   });
+
+  // Injeta zones/trendlines no state pros detectores poderem consultar
+  App.state.zones = App.trendData.zones;
+  App.state.trendlines = [...App.trendData.macroLines, ...App.trendData.microLines];
+
+  // Gera mosaico ANTES do scan pra que score predictors possam usar
+  // o histórico de placares simulados como referência empírica
+  App.mosaicGrid = generateScoresForMosaic(values, 20, 4);
+  App.state.recentScores = extractRecentScores(App.mosaicGrid, 30);
+
+  // 2. Fibonacci e Elliott
+  App.fibData = computeFibonacci(values, cfg.fibWindow || 60);
+  App.elliottData = detectElliottWaves(App.trendData.macroSwings, 8);
+
+  // 3. Detecta TODOS os sinais brutos
+  let rawSignals = scanAllPatterns(App.state, App.data, cfg.minConfidence);
+
+  // 3a. Filtro por SELEÇÃO MANUAL (mapa de sinais): se o usuário desabilitou
+  //     algum detector, remove esses sinais
+  if (cfg.disabledDetectors && cfg.disabledDetectors.length > 0) {
+    rawSignals = rawSignals.filter(s => !cfg.disabledDetectors.includes(s.pattern));
+  }
+
+  // 3b. Filtro por ACURÁCIA: remove padrões com taxa de erro > 40%
+  //     (ou seja, mantém só os com accuracy >= 60% no histórico).
+  //     Pode ser desligado via cfg.skipAccuracyFilter (auto-modo usa o
+  //     próprio rank, não precisa do filtro adicional).
+  let accuracyStats = {};
+  if (!cfg.skipAccuracyFilter && cfg.minPatternAccuracy > 0) {
+    const result = filterByAccuracy(rawSignals, values, cfg.backtestHorizon, cfg.minPatternAccuracy);
+    rawSignals = result.filtered;
+    accuracyStats = result.stats;
+  }
+
+  // 4. Dedupe pra reduzir poluição visual
+  App.signals = dedupeSignals(rawSignals, cfg.signalSpacing || 4, cfg.maxMarkers || 25);
+  App.rawSignalCount = rawSignals.length;
+  App.accuracyStats = accuracyStats;
+
+  App.btResults = backtestSignals(App.signals, values, cfg.backtestHorizon);
 
   document.getElementById('hdrMarket').textContent = market.name;
   document.getElementById('hdrWindow').textContent = cfg.bollingerWindow;
@@ -84,8 +115,10 @@ function renderAllPanels() {
 }
 
 function renderMosaicGrid() {
-  const values = App.state.values;
-  App.mosaicGrid = generateScoresForMosaic(values, 20, 4);
+  // Grid já foi gerado em loadAndRender; aqui só renderizamos
+  if (!App.mosaicGrid) {
+    App.mosaicGrid = generateScoresForMosaic(App.state.values, 20, 4);
+  }
   renderMosaicLive(App.mosaicGrid, App.currentRule || 'over25');
 
   // Visão 24h — usa a mesma regra de Over/Under selecionada
@@ -185,27 +218,35 @@ function buildCharts() {
   // - Mostra apenas em valores significativos (picos/vales) pra
   //   não poluir muito; em produção pode ser configurável
   // ============================================================
-  const goalNumberMarkers = App.data.map((d, i) => {
-    // Densidade adaptativa: ajusta o "step" conforme tamanho da série
-    // Para 76 pts → step 3; para 360 pts → step 7
-    const periodicStep = Math.max(3, Math.floor(App.data.length / 50));
-    const isLocalExtreme = isLocalPeakOrValley(App.data, i, 3);
-    const isPeriodic = i % periodicStep === 0;
-    if (!isLocalExtreme && !isPeriodic) return null;
+  // Lógica anti-colisão: garante espaçamento mínimo entre números
+  // E alterna position (above/below) para evitar valores grudados
+  const goalNumberMarkers = [];
+  const minIndexSpacing = Math.max(4, Math.floor(App.data.length / 45));
+  let lastShownIdx = -100;
+  let altPosition = false;
 
-    return {
+  App.data.forEach((d, i) => {
+    const isLocalExtreme = isLocalPeakOrValley(App.data, i, 4);
+    const isPeriodic = (i - lastShownIdx) >= minIndexSpacing;
+    const shouldShow = isLocalExtreme || isPeriodic;
+    if (!shouldShow) return;
+    if (i - lastShownIdx < 2) return; // hard floor: nunca dois consecutivos
+
+    altPosition = !altPosition;
+    goalNumberMarkers.push({
       time: d.time,
-      position: 'aboveBar',
-      color: isLocalExtreme ? '#facc15' : 'rgba(240,240,240,0.55)',
+      position: altPosition ? 'aboveBar' : 'belowBar',
+      color: isLocalExtreme ? '#facc15' : 'rgba(240,240,240,0.5)',
       shape: 'circle',
-      size: 0, // invisível, só pra ancorar texto
+      size: 0,
       text: String(d.value),
-    };
-  }).filter(Boolean);
+    });
+    lastShownIdx = i;
+  });
 
   // Une marcadores de sinais + números (a Lightweight Charts aceita um único array)
   // Ordena por tempo (requisito da API)
-  const allMarkers = [...App.markers, ...goalNumberMarkers].sort((a, b) => a.time - b.time);
+  const allMarkers = [...App.markers, ...goalNumberMarkers, ...(App.elliottMarkers || [])].sort((a, b) => a.time - b.time);
   App.series.goals.setMarkers(allMarkers);
 
   // ============================================================
@@ -215,12 +256,43 @@ function buildCharts() {
   App.series.trendlines = [];
   App.series.zones = [];
 
-  // ZONAS S/R (retângulos horizontais usando priceLines com cor preenchida)
+  // ZONAS S/R (linhas horizontais bem visíveis no gráfico)
   if (App.state.config.showZones !== false) {
     App.trendData.zones.slice(0, 6).forEach((zone, idx) => {
-      // Linha do centro da zona
+      // ============================================================
+      // EFEITO DE BANDA PREENCHIDA
+      // Lightweight Charts não tem "rectangle fill" nativo, então
+      // criamos N linhas horizontais empilhadas entre zone.low e
+      // zone.high, com transparência ALTA cada uma. Sobrepostas,
+      // dão impressão de banda colorida sólida.
+      // ============================================================
+      const bandColor = zone.strength >= 70
+        ? '90, 100, 140'   // forte = azulado escuro
+        : zone.strength >= 40
+          ? '110, 130, 160'  // médio = azulado médio
+          : '130, 145, 175'; // fraco = azulado claro
+
+      const numBands = 7; // mais bandas = banda mais lisa
+      for (let b = 0; b < numBands; b++) {
+        const t = b / (numBands - 1); // 0 → 1
+        const value = zone.low + (zone.high - zone.low) * t;
+        const fillLine = App.charts.main.addLineSeries({
+          color: `rgba(${bandColor}, ${0.16 + zone.strength / 800})`,
+          lineWidth: 4,
+          lineStyle: 0,
+          priceLineVisible: false,
+          lastValueVisible: false,
+        });
+        fillLine.setData([
+          { time: App.data[0].time, value },
+          { time: App.data[App.data.length - 1].time, value },
+        ]);
+        App.series.zones.push(fillLine);
+      }
+
+      // Linha central destacada (mais sólida) com etiqueta no eixo
       const centerLine = App.charts.main.addLineSeries({
-        color: `rgba(139,149,177,${0.25 + zone.strength / 400})`,
+        color: `rgba(${bandColor}, 0.85)`,
         lineWidth: 1,
         lineStyle: 0,
         priceLineVisible: false,
@@ -230,21 +302,13 @@ function buildCharts() {
         { time: App.data[0].time, value: zone.center },
         { time: App.data[App.data.length - 1].time, value: zone.center },
       ]);
-      // Linhas de preço pra topo e fundo da zona
+      // Etiqueta lateral identificando a zona (estilo DonForex)
       centerLine.createPriceLine({
-        price: zone.high,
-        color: `rgba(139,149,177,${0.15 + zone.strength / 600})`,
-        lineWidth: 1,
-        lineStyle: 1,
+        price: zone.center,
+        color: `rgba(${bandColor}, 0)`, // transparente, só pra mostrar título
+        lineWidth: 0,
         axisLabelVisible: true,
-        title: `SRZ ${zone.id} · ${zone.touches}t`,
-      });
-      centerLine.createPriceLine({
-        price: zone.low,
-        color: `rgba(139,149,177,${0.15 + zone.strength / 600})`,
-        lineWidth: 1,
-        lineStyle: 1,
-        axisLabelVisible: false,
+        title: `SRZ${zone.id} · R:${zone.range.toFixed(1)} · W:${zone.touches}`,
       });
       App.series.zones.push(centerLine);
     });
@@ -254,7 +318,7 @@ function buildCharts() {
   if (App.state.config.showTrendlines !== false) {
     App.trendData.macroLines.forEach(line => {
       const series = App.charts.main.addLineSeries({
-        color: line.type === 'resistance' ? 'rgba(239,68,68,0.7)' : 'rgba(38,194,129,0.7)',
+        color: line.type === 'resistance' ? 'rgba(239,68,68,0.85)' : 'rgba(38,194,129,0.85)',
         lineWidth: 2,
         lineStyle: 0,
         priceLineVisible: false,
@@ -281,6 +345,71 @@ function buildCharts() {
         { time: App.data[line.extendTo].time, value: line.extrapolatedValue },
       ]);
       App.series.trendlines.push(series);
+    });
+  }
+
+  // ============================================================
+  // 📏 FIBONACCI RETRACEMENT
+  // - Linhas horizontais entre o swing high e o swing low recentes
+  // - Apenas nos níveis 0/100% e nos "douradinhos" (38.2/50/61.8)
+  //   pra evitar poluição visual
+  // ============================================================
+  App.series.fibLines = [];
+  if (App.fibData && App.state.config.showFib !== false) {
+    // Linha de marcação do leg (high → low ou low → high)
+    const legSeries = App.charts.main.addLineSeries({
+      color: 'rgba(255, 181, 71, 0.4)',
+      lineWidth: 1,
+      lineStyle: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    legSeries.setData([
+      { time: App.data[App.fibData.legStart].time, value: App.fibData.direction === 'up' ? App.fibData.low : App.fibData.high },
+      { time: App.data[App.fibData.legEnd].time, value: App.fibData.direction === 'up' ? App.fibData.high : App.fibData.low },
+    ]);
+    App.series.fibLines.push(legSeries);
+
+    // Níveis "importantes" (filtrar pra não poluir)
+    const importantLevels = App.fibData.levels.filter(
+      l => l.importance === 'high' || l.importance === 'mid'
+    );
+    importantLevels.forEach(lvl => {
+      legSeries.createPriceLine({
+        price: lvl.value,
+        color: lvl.color,
+        lineWidth: lvl.importance === 'high' ? 2 : 1,
+        lineStyle: lvl.importance === 'high' ? 1 : 2,
+        axisLabelVisible: true,
+        title: `Fib ${lvl.label}`,
+      });
+    });
+  }
+
+  // ============================================================
+  // 🌊 ELLIOTT WAVES — labels nos pontos pivôs
+  // Sempre renderiza se há dados; cor saturada quando estrutura
+  // é válida (passou nas 3 regras), cor faded caso contrário
+  // ============================================================
+  App.elliottMarkers = [];
+  if (App.elliottData && App.state.config.showElliott !== false) {
+    App.elliottMarkers = App.elliottData.points.map(p => {
+      const isValid = App.elliottData.isValid;
+      let color;
+      if (isValid) {
+        color = p.isImpulsive ? '#ffb547' : '#a855f7';
+      } else {
+        // Estrutura indefinida: usa cinza translúcido
+        color = p.type === 'H' ? 'rgba(255, 181, 71, 0.4)' : 'rgba(168, 85, 247, 0.4)';
+      }
+      return {
+        time: App.data[p.index].time,
+        position: p.type === 'H' ? 'aboveBar' : 'belowBar',
+        color,
+        shape: 'circle',
+        size: 1,
+        text: p.waveLabel,
+      };
     });
   }
 
@@ -388,6 +517,46 @@ function setupEventListeners() {
   document.getElementById('tgZones')?.addEventListener('change', e => {
     const v = e.target.checked;
     (App.series.zones || []).forEach(s => s.applyOptions({ visible: v }));
+  });
+  document.getElementById('tgFib')?.addEventListener('change', e => {
+    const v = e.target.checked;
+    (App.series.fibLines || []).forEach(s => s.applyOptions({ visible: v }));
+  });
+  document.getElementById('tgElliott')?.addEventListener('change', e => {
+    refreshMarkers();
+  });
+
+  // === MAPA DE SINAIS ===
+  document.getElementById('btnSignalMap')?.addEventListener('click', () => {
+    const cfg = ConfigStore.load();
+    SignalMap.render(App.accuracyStats || {}, cfg.disabledDetectors || []);
+    document.getElementById('signalMapModal').classList.add('active');
+  });
+  document.getElementById('closeSignalMap')?.addEventListener('click', () => {
+    document.getElementById('signalMapModal').classList.remove('active');
+  });
+  document.getElementById('btnAutoSelect')?.addEventListener('click', () => {
+    const auto = autoSelectBestDetectors(App.state, App.data, { topN: 5, minSamples: 3 });
+    if (auto.top.length > 0) {
+      SignalMap.applyAutoSelection(auto.top);
+      showToast({
+        pattern: '🤖 AUTO-SELEÇÃO',
+        direction: 'over',
+        confidence: 100,
+        message: `Top 5 selecionados: ${auto.top.map(p => p.split(' ')[0]).join(', ')}`,
+      });
+    } else {
+      alert('Histórico insuficiente pra auto-seleção. Tente com mais dados.');
+    }
+  });
+  document.getElementById('btnSelectAll')?.addEventListener('click', () => SignalMap.selectAll(true));
+  document.getElementById('btnSelectNone')?.addEventListener('click', () => SignalMap.selectAll(false));
+  document.getElementById('btnApplySignalMap')?.addEventListener('click', () => {
+    const cfg = ConfigStore.load();
+    cfg.disabledDetectors = SignalMap.readSelection();
+    ConfigStore.save(cfg);
+    document.getElementById('signalMapModal').classList.remove('active');
+    loadAndRender(App.currentMarket);
   });
 
   // Tabs do mosaico (Live ↔ 24h)
@@ -630,6 +799,7 @@ function refreshMarkers() {
 
   const showSignals = document.getElementById('tgMarkers')?.checked !== false;
   const showNumbers = document.getElementById('tgNumbers')?.checked !== false;
+  const showElliott = document.getElementById('tgElliott')?.checked !== false;
 
   let toShow = [];
 
@@ -637,27 +807,74 @@ function refreshMarkers() {
     toShow = toShow.concat(App.markers);
   }
 
+  if (showElliott && App.elliottMarkers) {
+    toShow = toShow.concat(App.elliottMarkers);
+  }
+
   if (showNumbers && App.data) {
-    const numberMarkers = App.data.map((d, i) => {
-      const periodicStep = Math.max(3, Math.floor(App.data.length / 50));
-      const isLocalExtreme = isLocalPeakOrValley(App.data, i, 3);
-      const isPeriodic = i % periodicStep === 0;
-      if (!isLocalExtreme && !isPeriodic) return null;
-      return {
+    const minIndexSpacing = Math.max(4, Math.floor(App.data.length / 45));
+    let lastShownIdx = -100;
+    let altPosition = false;
+    App.data.forEach((d, i) => {
+      const isLocalExtreme = isLocalPeakOrValley(App.data, i, 4);
+      const isPeriodic = (i - lastShownIdx) >= minIndexSpacing;
+      const shouldShow = isLocalExtreme || isPeriodic;
+      if (!shouldShow) return;
+      if (i - lastShownIdx < 2) return;
+      altPosition = !altPosition;
+      toShow.push({
         time: d.time,
-        position: 'aboveBar',
-        color: isLocalExtreme ? '#facc15' : 'rgba(240,240,240,0.55)',
+        position: altPosition ? 'aboveBar' : 'belowBar',
+        color: isLocalExtreme ? '#facc15' : 'rgba(240,240,240,0.5)',
         shape: 'circle',
         size: 0,
         text: String(d.value),
-      };
-    }).filter(Boolean);
-    toShow = toShow.concat(numberMarkers);
+      });
+      lastShownIdx = i;
+    });
   }
 
   toShow.sort((a, b) => a.time - b.time);
   App.series.goals.setMarkers(toShow);
 }
 
+// ============================================================
+// 🕐 FOOTER CLOCK + INFO DE JOGOS
+// ============================================================
+// Atualiza a cada segundo:
+// - Relógio em horário de Brasília
+// - Info do jogo atual (último ponto da série)
+// - Info do próximo jogo (4 minutos à frente)
+
+function startFooterClock() {
+  const update = () => {
+    // Relógio Brasília
+    document.getElementById('clockTime').textContent = BR.hms(Date.now());
+
+    // Jogo atual: último ponto da série
+    if (App.data && App.data.length > 0) {
+      const last = App.data[App.data.length - 1];
+      const lastTime = BR.hm(last.time);
+      const marketName = MARKETS[App.currentMarket]?.name || 'Copa';
+      document.getElementById('footerGameCurrent').textContent =
+        `${lastTime} · ${marketName} · ${last.value} gols`;
+
+      // Próximo jogo: +4 min
+      const nextTime = last.time + 240;
+      const nextDate = new Date(nextTime * 1000);
+      const minutesAway = Math.max(0, Math.round((nextTime * 1000 - Date.now()) / 60000));
+      const countdown = minutesAway > 0 ? ` (em ${minutesAway}min)` : ' (agora)';
+      document.getElementById('footerGameNext').textContent =
+        `${BR.hm(nextTime)}${countdown}`;
+    }
+  };
+
+  update();
+  setInterval(update, 1000);
+}
+
 // ====== START ======
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  startFooterClock();
+});

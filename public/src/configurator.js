@@ -16,13 +16,17 @@ const ConfigStore = {
     maFast: 9,
     maSlow: 21,
     backtestHorizon: 3,
-    minConfidence: 60,        // 35 → 60: filtra mais agressivamente
-    signalSpacing: 4,         // mínimo de rodadas entre sinais (evita aglomeração)
-    maxMarkers: 20,           // limite global de marcadores no gráfico
-    macroSwingBars: 12,       // janela de pivôs pra trendlines macro
-    microSwingBars: 4,        // janela de pivôs pra trendlines micro
-    srTolerance: 2.5,         // amplitude vertical pra agrupar zona S/R
-    srMinTouches: 3,          // toques mínimos pra zona ser considerada
+    minConfidence: 50,        // (era 60) — agora o filtro principal é accuracy
+    minPatternAccuracy: 60,   // novo: padrão precisa ter ≥60% acerto histórico (≤40% erro)
+    disabledDetectors: [],    // padrões desligados pelo usuário no Mapa de Sinais
+    autoSelectMode: false,    // se true, usa só os top N detectores por accuracy
+    autoSelectTopN: 5,
+    signalSpacing: 4,
+    maxMarkers: 20,
+    macroSwingBars: 12,
+    microSwingBars: 4,
+    srTolerance: 2.5,
+    srMinTouches: 3,
     showTrendlines: true,
     showZones: true,
   },

@@ -60,23 +60,55 @@ function findSwings(values, leftBars = 5, rightBars = 5) {
  * Retorna pares { p1, p2, slope, type } onde p1/p2 são os pontos da reta
  * e podemos extrapolar pra qualquer índice futuro.
  */
-function buildTrendlines(swings, dataLen, label = 'macro') {
+function buildTrendlines(swings, dataLen, label = 'macro', valueRange = null) {
   const lines = [];
+
+  // Limite máximo de projeção forward: 30 rodadas (~2h) além do último pivô
+  // Evita linhas se afastando demais do "presente"
+  const FORWARD_LIMIT = 30;
+
+  const project = (p1, p2, targetIdx) => {
+    const slope = (p2.value - p1.value) / (p2.index - p1.index);
+    const raw = p2.value + slope * (targetIdx - p2.index);
+    if (!valueRange) return { value: raw, slope, clamped: false, targetIdx };
+
+    // Clamp apertado: 5% do range pra cada lado (antes era 15%)
+    const buffer = (valueRange.max - valueRange.min) * 0.05;
+    const min = valueRange.min - buffer;
+    const max = valueRange.max + buffer;
+
+    // Se o raw está fora do range, ENCURTA a linha pra parar onde ela
+    // intersectaria a borda do range (visualmente mais correto)
+    if (raw > max || raw < min) {
+      const boundary = raw > max ? max : min;
+      // Calcula em qual índice a linha cruza a borda
+      const intersectIdx = Math.round(p2.index + (boundary - p2.value) / slope);
+      // Garante que o índice ficou DEPOIS do p2 (faz sentido) e DENTRO da série
+      if (intersectIdx > p2.index && intersectIdx < dataLen) {
+        return { value: boundary, slope, clamped: true, targetIdx: intersectIdx };
+      }
+      // Fallback: clampa só o valor
+      return { value: Math.max(min, Math.min(max, raw)), slope, clamped: true, targetIdx };
+    }
+    return { value: raw, slope, clamped: false, targetIdx };
+  };
 
   // RESISTÊNCIA — pega os 2 últimos topos
   if (swings.swingHighs.length >= 2) {
     const last = swings.swingHighs[swings.swingHighs.length - 1];
     const prev = swings.swingHighs[swings.swingHighs.length - 2];
-    const slope = (last.value - prev.value) / (last.index - prev.index);
+    // Limite forward
+    const target = Math.min(dataLen - 1, last.index + FORWARD_LIMIT);
+    const projection = project(prev, last, target);
     lines.push({
       type: 'resistance',
       label,
       p1: prev,
       p2: last,
-      slope,
-      // extrapola até o final da série
-      extendTo: dataLen - 1,
-      extrapolatedValue: last.value + slope * (dataLen - 1 - last.index),
+      slope: projection.slope,
+      extendTo: projection.targetIdx,
+      extrapolatedValue: projection.value,
+      wasClamped: projection.clamped,
     });
   }
 
@@ -84,15 +116,17 @@ function buildTrendlines(swings, dataLen, label = 'macro') {
   if (swings.swingLows.length >= 2) {
     const last = swings.swingLows[swings.swingLows.length - 1];
     const prev = swings.swingLows[swings.swingLows.length - 2];
-    const slope = (last.value - prev.value) / (last.index - prev.index);
+    const target = Math.min(dataLen - 1, last.index + FORWARD_LIMIT);
+    const projection = project(prev, last, target);
     lines.push({
       type: 'support',
       label,
       p1: prev,
       p2: last,
-      slope,
-      extendTo: dataLen - 1,
-      extrapolatedValue: last.value + slope * (dataLen - 1 - last.index),
+      slope: projection.slope,
+      extendTo: projection.targetIdx,
+      extrapolatedValue: projection.value,
+      wasClamped: projection.clamped,
     });
   }
 
@@ -179,11 +213,17 @@ function computeTrendlinesAndZones(values, cfg = {}) {
     ...cfg,
   };
 
+  // Range vertical real da série (usado pra clampar extrapolações)
+  const valueRange = {
+    min: Math.min(...values),
+    max: Math.max(...values),
+  };
+
   const macroSwings = findSwings(values, c.macroSwingBars, c.macroSwingBars);
   const microSwings = findSwings(values, c.microSwingBars, c.microSwingBars);
 
-  const macroLines = buildTrendlines(macroSwings, values.length, 'macro');
-  const microLines = buildTrendlines(microSwings, values.length, 'micro');
+  const macroLines = buildTrendlines(macroSwings, values.length, 'macro', valueRange);
+  const microLines = buildTrendlines(microSwings, values.length, 'micro', valueRange);
 
   // S/R usa pivôs MACRO (mais confiáveis pra zonas)
   const zones = buildSRZones(values, macroSwings, c.srTolerance, c.srMinTouches);
@@ -194,5 +234,6 @@ function computeTrendlinesAndZones(values, cfg = {}) {
     zones,
     macroSwings,
     microSwings,
+    valueRange,
   };
 }

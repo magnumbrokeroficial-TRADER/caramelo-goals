@@ -494,6 +494,247 @@ function detectBottomCluster(state, i) {
   };
 }
 
+// ============================================================
+// 13️⃣ TOQUE NA ZONA S/R (rebote)
+// ============================================================
+// Quando o valor toca uma zona S/R com força e recua, indica
+// que a zona está "ativa". Direção depende de qual tipo de zona:
+// - Toque na zona INFERIOR (fundo) → bounce esperado pra cima (Over)
+// - Toque na zona SUPERIOR (topo) → rejeição esperada pra baixo (Under)
+function detectSRTouch(state, i) {
+  if (!state.zones || state.zones.length === 0) return null;
+  if (i < 25) return null;
+
+  const v = state.values[i];
+  const prevV = state.values[i - 1];
+
+  // Encontra a zona mais próxima do valor atual
+  let nearestZone = null, minDist = Infinity;
+  state.zones.forEach(z => {
+    const dist = v >= z.low && v <= z.high ? 0 : Math.min(Math.abs(v - z.low), Math.abs(v - z.high));
+    if (dist < minDist) { minDist = dist; nearestZone = z; }
+  });
+
+  if (!nearestZone || minDist > 1.5) return null;
+
+  // Direção esperada: se zona é "baixa" da série, esperamos bounce (over)
+  const seriesMid = (Math.max(...state.values) + Math.min(...state.values)) / 2;
+  const isLowerZone = nearestZone.center < seriesMid;
+  const direction = isLowerZone ? 'over' : 'under';
+
+  // Sinal de bounce: tocou e já começou a se afastar na direção certa
+  const bouncing = direction === 'over' ? v > prevV : v < prevV;
+
+  if (!bouncing) return null;
+
+  const confidence = Math.min(100, 30 + nearestZone.strength * 0.5 + (bouncing ? 20 : 0));
+
+  return {
+    active: true,
+    confidence,
+    pattern: 'TOQUE EM ZONA S/R',
+    direction,
+    message: `Valor ${v} tocou ${isLowerZone ? 'suporte' : 'resistência'} na zona SRZ${nearestZone.id} (${nearestZone.touches} toques históricos) e está ${direction === 'over' ? 'subindo' : 'descendo'}.`,
+    market: direction === 'over' ? ['Over 2.5 FT', 'Ambas Sim'] : ['Under 2.5 FT'],
+    checks: [
+      { name: `Zona S/R próxima (dist ${minDist.toFixed(1)})`, passed: true, detail: `SRZ${nearestZone.id} centro ${nearestZone.center.toFixed(1)}` },
+      { name: `Força da zona (${nearestZone.strength}/100)`, passed: nearestZone.strength >= 50, detail: `${nearestZone.touches} toques` },
+      { name: 'Movimento de bounce confirmado', passed: bouncing, detail: `${prevV} → ${v}` },
+    ],
+  };
+}
+
+// ============================================================
+// 14️⃣ QUEBRA DE ZONA S/R (breakout)
+// ============================================================
+// Quando o valor cruza uma zona S/R com força (volume = momento),
+// indica continuação da quebra.
+function detectSRBreak(state, i) {
+  if (!state.zones || state.zones.length === 0) return null;
+  if (i < 25) return null;
+
+  const v = state.values[i];
+  const prevV = state.values[i - 1];
+  const m = state.mom[i];
+  if (m === null) return null;
+
+  // Procura zona que foi cruzada entre prevV e v
+  for (const z of state.zones) {
+    const crossedUp = prevV < z.low && v > z.high;       // quebrou pra cima
+    const crossedDown = prevV > z.high && v < z.low;     // quebrou pra baixo
+    if (!crossedUp && !crossedDown) continue;
+
+    const direction = crossedUp ? 'over' : 'under';
+    // Confirmação: momento na direção da quebra
+    const momConfirms = crossedUp ? m > 0 : m < 0;
+    if (!momConfirms) continue;
+
+    const confidence = Math.min(100, 40 + z.strength * 0.4 + Math.abs(m) * 5);
+
+    return {
+      active: true,
+      confidence,
+      pattern: 'QUEBRA DE ZONA S/R',
+      direction,
+      message: `Valor cruzou a zona SRZ${z.id} (${z.touches} toques histórico) com momento ${m > 0 ? 'positivo' : 'negativo'}. Quebra estrutural ${direction === 'over' ? 'pra mais gols' : 'pra menos gols'}.`,
+      market: direction === 'over' ? ['Over 2.5 FT', 'Over 3.5 FT'] : ['Under 2.5 FT'],
+      checks: [
+        { name: `Zona ${crossedUp ? 'rompida pra cima' : 'rompida pra baixo'}`, passed: true, detail: `SRZ${z.id}` },
+        { name: 'Momento confirma direção', passed: momConfirms, detail: `Mom=${m.toFixed(2)}` },
+        { name: `Força da zona (${z.strength}/100)`, passed: z.strength >= 40, detail: `${z.touches} toques` },
+      ],
+    };
+  }
+  return null;
+}
+
+// ============================================================
+// 15️⃣ TOQUE EM TRENDLINE (rebote)
+// ============================================================
+// Detecta quando o valor toca uma trendline projetada e recua na
+// direção da tendência (continuação).
+function detectTrendlineTouch(state, i) {
+  if (!state.trendlines || state.trendlines.length === 0) return null;
+  if (i < 25) return null;
+
+  const v = state.values[i];
+  const prevV = state.values[i - 1];
+
+  for (const line of state.trendlines) {
+    // Calcula o valor da trendline no índice i
+    const slope = (line.p2.value - line.p1.value) / (line.p2.index - line.p1.index);
+    const lineVal = line.p2.value + slope * (i - line.p2.index);
+    const dist = Math.abs(v - lineVal);
+    if (dist > 1.5) continue;
+
+    const isResistance = line.type === 'resistance';
+    const direction = isResistance ? 'under' : 'over';
+    // Bounce: se é resistência, esperamos que o valor recue pra baixo
+    const bouncing = isResistance ? v < prevV : v > prevV;
+    if (!bouncing) continue;
+
+    const confidence = Math.min(85, 50 + (1.5 - dist) * 15);
+
+    return {
+      active: true,
+      confidence,
+      pattern: 'TOQUE EM TRENDLINE',
+      direction,
+      message: `Valor ${v} tocou trendline de ${isResistance ? 'resistência' : 'suporte'} (${line.label}) e ${bouncing ? 'já recua' : 'parou'}. Tendência tende a continuar respeitando a linha.`,
+      market: direction === 'over' ? ['Over 2.5 FT'] : ['Under 2.5 FT'],
+      checks: [
+        { name: `Distância da linha (${dist.toFixed(1)})`, passed: dist < 1, detail: `linha em ${lineVal.toFixed(1)}` },
+        { name: 'Movimento de rebote', passed: bouncing, detail: `${prevV} → ${v}` },
+        { name: `Tipo: ${line.label}`, passed: line.label === 'macro', detail: line.type },
+      ],
+    };
+  }
+  return null;
+}
+
+// ============================================================
+// 16️⃣ CRUZAMENTO BIG ODDS (Over 2.5 + Over 3.5 ≥ 70%)
+// ============================================================
+// Sinal especial que dispara quando AMBOS os mercados Over 2.5 e
+// Over 3.5 têm probabilidade estimada >= 70%. Cenário ideal pra
+// apostas combinadas (Big Odds = altas multiplicações).
+//
+// COMO ESTIMAMOS A PROBABILIDADE (sem odds reais):
+// O valor da série = total de gols nas últimas 20 rodadas.
+//   - Valor 50 → média 2.5 gols/jogo (limiar do Over 2.5)
+//   - Valor 60 → média 3.0 gols/jogo (folga pra Over 2.5; perto do Over 3.5)
+//   - Valor 70 → média 3.5 gols/jogo (limiar do Over 3.5)
+//
+// Combinamos o NÍVEL atual (acima de quanto?) com:
+//   - Momento (subindo/descendo)
+//   - RSI (saudável vs saturado)
+//   - Tendência (acima/abaixo da média da série)
+// pra obter um score 0-100 que aproxima a probabilidade.
+
+function estimateMarketProbabilities(state, i) {
+  const v = state.values[i];
+  const mom = state.mom[i];
+  const rsi = state.rsi[i];
+  const middle = state.bands.middle[i];
+
+  if (mom === null || rsi === null || middle === null) return null;
+
+  // Média histórica da série (estabiliza em ~46 nos seus dados)
+  const seriesAvg = state.values.reduce((a, b) => a + b, 0) / state.values.length;
+
+  // ============= CALCULO BASE =============
+  // Threshold conceitual: valor=50 ↔ média 2.5 gols/jogo (limiar do Over 2.5)
+  //                        valor=70 ↔ média 3.5 gols/jogo (limiar do Over 3.5)
+  // Quando o valor está bem acima desses thresholds, a probabilidade sobe.
+
+  // P(Over 2.5) base: distância do valor ao threshold 50, ajustada
+  // por uma função sigmoide-ish que satura em 0 e 100
+  const distFromOver25 = v - 50;
+  let probOver25 = 50 + distFromOver25 * 3; // cada gol acima de 50 = +3pp
+  // Bonus por momento positivo (subindo)
+  probOver25 += Math.max(-15, Math.min(15, mom * 4));
+  // Bonus por RSI saudável (50-70)
+  if (rsi > 50 && rsi < 75) probOver25 += (rsi - 50) * 0.4;
+  // Penalidade por RSI saturado (sinal de exaustão)
+  if (rsi >= 75) probOver25 -= (rsi - 75) * 0.8;
+  // Bonus por estar acima da média móvel da janela
+  if (v > middle) probOver25 += 5;
+
+  probOver25 = Math.max(0, Math.min(100, probOver25));
+
+  // P(Over 3.5): mesma lógica, threshold 55 (calibrado pra séries reais
+  // onde valores raramente passam de 65). Penalty menor que antes
+  // pra que o sinal seja factível.
+  const distFromOver35 = v - 55;
+  let probOver35 = 50 + distFromOver35 * 3.5;
+  probOver35 += Math.max(-15, Math.min(15, mom * 4));
+  if (rsi > 50 && rsi < 75) probOver35 += (rsi - 50) * 0.5;
+  if (rsi >= 75) probOver35 -= (rsi - 75) * 0.8;
+  // Bonus por estar muito acima da média histórica
+  if (v > seriesAvg * 1.10) probOver35 += 6;
+  if (v > seriesAvg * 1.20) probOver35 += 6; // bonus adicional pra valores extremos
+
+  probOver35 = Math.max(0, Math.min(100, probOver35));
+
+  return { probOver25, probOver35, level: v, momentum: mom, rsi };
+}
+
+function detectBigOddsCrossover(state, i) {
+  if (i < 25) return null;
+
+  const probs = estimateMarketProbabilities(state, i);
+  if (!probs) return null;
+
+  // CRUZAMENTO: ambos os mercados precisam estar >= 70%
+  const THRESHOLD = 70;
+  const crossing = probs.probOver25 >= THRESHOLD && probs.probOver35 >= THRESHOLD;
+  if (!crossing) return null;
+
+  // Confiança = média dos dois (ambos altos = sinal forte)
+  const confidence = Math.round((probs.probOver25 + probs.probOver35) / 2);
+
+  return {
+    active: true,
+    confidence,
+    pattern: 'CRUZAMENTO BIG ODDS',
+    direction: 'over',
+    backtestType: 'sustainHighLevel', // backtest custom: mede manutenção de nível alto
+    sustainThreshold: 50, // valor mínimo a sustentar nas próximas rodadas
+    message: `🎯 BIG ODDS: ambos os mercados convergiram acima de 70%. Over 2.5 com ${probs.probOver25.toFixed(0)}% e Over 3.5 com ${probs.probOver35.toFixed(0)}%. Cenário ideal pra apostas combinadas com alta multiplicação.`,
+    market: [
+      `Over 2.5 FT (${probs.probOver25.toFixed(0)}%)`,
+      `Over 3.5 FT (${probs.probOver35.toFixed(0)}%)`,
+      'Combinada O2.5 + O3.5',
+    ],
+    checks: [
+      { name: 'Prob. Over 2.5 ≥ 70%', passed: probs.probOver25 >= 70, detail: `${probs.probOver25.toFixed(0)}%` },
+      { name: 'Prob. Over 3.5 ≥ 70%', passed: probs.probOver35 >= 70, detail: `${probs.probOver35.toFixed(0)}%` },
+      { name: 'Nível elevado', passed: probs.level >= 55, detail: `${probs.level} gols/janela` },
+      { name: 'Momento e RSI alinhados', passed: probs.momentum > 0 && probs.rsi > 50, detail: `Mom ${probs.momentum.toFixed(2)} · RSI ${probs.rsi.toFixed(0)}` },
+    ],
+  };
+}
+
 // ====== EXPORTA TODOS ======
 const DETECTORS = [
   detectMeanReversion,
@@ -508,4 +749,8 @@ const DETECTORS = [
   detectShootingStar,
   detectTopCluster,
   detectBottomCluster,
+  detectSRTouch,
+  detectSRBreak,
+  detectTrendlineTouch,
+  detectBigOddsCrossover,
 ];

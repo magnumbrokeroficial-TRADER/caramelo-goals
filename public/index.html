@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Caramelo Goals — Sistema Completo</title>
+<title>CÓDIGO.TIPS — Análise Técnica de Gols</title>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="src/styles.css">
 </head>
@@ -12,8 +12,8 @@
 <!-- ============== HEADER ============== -->
 <header>
   <div class="logo">
-    <div class="logo-mark">⚽</div>
-    <span>caramelo<span style="opacity:0.5">.goals</span></span>
+    <div class="logo-mark">{ }</div>
+    <span>CÓDIGO<span style="opacity:0.5">.TIPS</span></span>
   </div>
   <div class="markets" id="markets">
     <button class="market-btn active" data-market="copa">🏆 Copa</button>
@@ -22,6 +22,7 @@
     <button class="market-btn" data-market="premier">🏴 Premier</button>
   </div>
   <div class="header-spacer"></div>
+  <button class="toolbar-btn" id="btnSignalMap" title="Mapa de Sinais"><span>🗺️</span> Mapa de Sinais</button>
   <button class="toolbar-btn" id="btnConfig" title="Configurador"><span>⚙️</span> Configurar</button>
   <button class="toolbar-btn" id="btnNotify" title="Notificações"><span>🔔</span> Alertas</button>
   <div class="scan-badge">
@@ -48,6 +49,8 @@
     <label class="toggle"><input type="checkbox" id="tgNumbers" checked> Nº Gols</label>
     <label class="toggle"><input type="checkbox" id="tgTrendlines" checked> Tendência</label>
     <label class="toggle"><input type="checkbox" id="tgZones" checked> Zonas S/R</label>
+    <label class="toggle"><input type="checkbox" id="tgFib" checked> Fibonacci</label>
+    <label class="toggle"><input type="checkbox" id="tgElliott" checked> Elliott</label>
   </div>
 </div>
 
@@ -140,14 +143,65 @@
 
 <footer>
   <div class="status-dot"></div>
-  <span>SCANNER ATIVO</span>
+  <span>SCANNER</span>
   <span style="color:#8b95b1">|</span>
   <span id="footerSignals">0 sinais</span>
   <span style="color:#8b95b1">|</span>
   <span>Janela: <span id="footerWindow">20</span></span>
   <div class="footer-spacer"></div>
-  <span style="color:#5a6584">v2.0 · Lightweight Charts™ · Detector próprio</span>
+  <div class="footer-game-info">
+    <div class="game-current">
+      <span class="game-label">⚽ Atual:</span>
+      <span class="game-value" id="footerGameCurrent">—</span>
+    </div>
+    <span style="color:#8b95b1">|</span>
+    <div class="game-next">
+      <span class="game-label">⏭️ Próximo:</span>
+      <span class="game-value" id="footerGameNext">—</span>
+    </div>
+    <span style="color:#8b95b1">|</span>
+    <div class="footer-clock" id="footerClock">
+      <span class="clock-icon">🕐</span>
+      <span id="clockTime">00:00:00</span>
+      <span class="clock-tz">BRT</span>
+    </div>
+  </div>
 </footer>
+
+<!-- ===== MODAL: SIGNAL MAP ===== -->
+<div class="modal-overlay" id="signalMapModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <div class="modal-title">🗺️ Mapa de Sinais</div>
+      <button class="modal-close" id="closeSignalMap">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-intro">
+        Escolha quais detectores você quer usar. Cada padrão tem sua taxa de acerto histórica
+        baseada nos dados atuais. Padrões com <strong>≥60% de acerto</strong> aparecem em verde
+        — esses são os recomendados.
+      </p>
+
+      <div class="signal-map-actions">
+        <button class="action-btn primary" id="btnAutoSelect">
+          🤖 Auto-selecionar Top 5 (melhor histórico)
+        </button>
+        <button class="action-btn" id="btnSelectAll">✓ Selecionar todos</button>
+        <button class="action-btn" id="btnSelectNone">✕ Desmarcar todos</button>
+      </div>
+
+      <div class="signal-map-list" id="signalMapList">
+        <!-- preenchido dinamicamente -->
+      </div>
+
+      <div class="signal-map-footer">
+        <button class="action-btn primary" id="btnApplySignalMap">
+          Aplicar e recarregar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ===== MODAL: CONFIGURATOR ===== -->
 <div class="modal-overlay" id="configModal">
@@ -275,11 +329,15 @@
 <script src="src/data.js"></script>
 <script src="src/indicators.js"></script>
 <script src="src/trendlines.js"></script>
+<script src="src/fibonacci.js"></script>
+<script src="src/elliott.js"></script>
 <script src="src/detectors.js"></script>
+<script src="src/scorePredictors.js"></script>
 <script src="src/engine.js"></script>
 <script src="src/mosaic.js"></script>
 <script src="src/notifications.js"></script>
 <script src="src/configurator.js"></script>
+<script src="src/signalMap.js"></script>
 <script src="src/ui.js"></script>
 <script src="src/app.js"></script>
 
