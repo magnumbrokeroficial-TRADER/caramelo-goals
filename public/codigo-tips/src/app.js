@@ -517,8 +517,130 @@ function buildCharts() {
 }
 
 /* ============================================================
-   📚 HISTÓRICO ACUMULADO (DarkOdds)
+   💰 MODAL DE ODDS — clica no mosaico, mostra jogos reais
    ============================================================ */
+
+async function openOddsModal(liga) {
+  const modal = document.getElementById('oddsModal');
+  const content = document.getElementById('oddsModalContent');
+  const ligaLabel = document.getElementById('oddsModalLiga');
+  if (!modal || !content) return;
+
+  // Abre modal em loading
+  ligaLabel.textContent = (MARKETS[liga]?.name || liga).toUpperCase();
+  content.innerHTML = '<div class="history-loading">Carregando jogos…</div>';
+  modal.classList.add('active');
+
+  // Busca odds via API (com cache de 2min)
+  const oddsData = await fetchOdds(liga);
+
+  if (!oddsData || !Array.isArray(oddsData.jogos) || oddsData.jogos.length === 0) {
+    content.innerHTML = `
+      <div class="history-empty">
+        Sem jogos disponíveis para ${liga}.<br>
+        <small>API retornou vazio ou está offline. Cheque o console (F12) pro erro completo.</small>
+      </div>`;
+    return;
+  }
+
+  // Renderiza lista de jogos
+  content.innerHTML = `
+    <div class="odds-jogos-count">${oddsData.jogos.length} jogos disponíveis</div>
+    <div class="odds-list">
+      ${oddsData.jogos.map((j, idx) => renderJogoCard(j, idx)).join('')}
+    </div>
+  `;
+}
+
+// Renderiza um único jogo defensivamente (a estrutura pode variar)
+function renderJogoCard(jogo, idx) {
+  // Tenta extrair info de várias chaves possíveis (defensive parsing)
+  const homeTeam = jogo.home_team || jogo.home || jogo.casa || jogo.time_casa || '—';
+  const awayTeam = jogo.away_team || jogo.away || jogo.fora || jogo.time_fora || '—';
+  const matchName = jogo.match || `${homeTeam} vs ${awayTeam}`;
+  const horario = jogo.time || jogo.start_time || jogo.horario || jogo.commence_time;
+  const horarioFmt = horario ? BR.hm(new Date(horario)) : '—';
+
+  // Odds Over (procura em vários paths)
+  const totals = jogo.totals || jogo.over_under || {};
+  const o25 = pickOdd(totals, ['over25', 'over_2_5', '2.5', 'O2.5', 25]);
+  const o35 = pickOdd(totals, ['over35', 'over_3_5', '3.5', 'O3.5', 35]);
+  const o45 = pickOdd(totals, ['over45', 'over_4_5', '4.5', 'O4.5', 45]);
+
+  // BTTS
+  const btts = jogo.btts || jogo.ambas_marcam || {};
+  const bttsSim = pickOdd(btts, ['yes', 'sim', 'Yes', 'Sim', 'y']);
+  const bttsNao = pickOdd(btts, ['no', 'nao', 'não', 'No', 'Nao', 'n']);
+
+  // 1X2 (Casa / Empate / Fora)
+  const m1x2 = jogo.markets?.['1x2'] || jogo.markets?.matchWinner || jogo.h2h || {};
+  const oddCasa = pickOdd(m1x2, ['home', '1', 'casa']);
+  const oddEmpate = pickOdd(m1x2, ['draw', 'X', 'empate']);
+  const oddFora = pickOdd(m1x2, ['away', '2', 'fora']);
+
+  // Bookmakers (se vier lista, mostra primeiro)
+  const bookmaker = Array.isArray(jogo.bookmakers) && jogo.bookmakers.length > 0
+    ? (jogo.bookmakers[0].name || jogo.bookmakers[0].key || 'Bet365')
+    : (jogo.bookmaker || 'Bet365');
+
+  return `
+    <div class="odds-jogo">
+      <div class="odds-jogo-header">
+        <div class="odds-jogo-match">${matchName}</div>
+        <div class="odds-jogo-meta">
+          <span>🕐 ${horarioFmt}</span>
+          <span class="odds-bookmaker">${bookmaker}</span>
+        </div>
+      </div>
+
+      <div class="odds-section">
+        <div class="odds-section-label">Casa / Empate / Fora</div>
+        <div class="odds-row">
+          <div class="odd-cell"><span class="odd-label">1</span><span class="odd-value">${fmtOdd(oddCasa)}</span></div>
+          <div class="odd-cell"><span class="odd-label">X</span><span class="odd-value">${fmtOdd(oddEmpate)}</span></div>
+          <div class="odd-cell"><span class="odd-label">2</span><span class="odd-value">${fmtOdd(oddFora)}</span></div>
+        </div>
+      </div>
+
+      <div class="odds-section">
+        <div class="odds-section-label">Total de Gols (Over)</div>
+        <div class="odds-row">
+          <div class="odd-cell over"><span class="odd-label">Over 2.5</span><span class="odd-value">${fmtOdd(o25)}</span></div>
+          <div class="odd-cell over"><span class="odd-label">Over 3.5</span><span class="odd-value">${fmtOdd(o35)}</span></div>
+          <div class="odd-cell over"><span class="odd-label">Over 4.5</span><span class="odd-value">${fmtOdd(o45)}</span></div>
+        </div>
+      </div>
+
+      <div class="odds-section">
+        <div class="odds-section-label">Ambas Marcam (BTTS)</div>
+        <div class="odds-row">
+          <div class="odd-cell btts"><span class="odd-label">Sim</span><span class="odd-value">${fmtOdd(bttsSim)}</span></div>
+          <div class="odd-cell btts"><span class="odd-label">Não</span><span class="odd-value">${fmtOdd(bttsNao)}</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Helpers tolerantes ao formato variável da API
+function pickOdd(obj, keys) {
+  if (!obj || typeof obj !== 'object') return null;
+  for (const k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null) {
+      const v = typeof obj[k] === 'object' ? (obj[k].odd || obj[k].price || obj[k].value) : obj[k];
+      if (v !== undefined && v !== null) return v;
+    }
+  }
+  return null;
+}
+
+function fmtOdd(v) {
+  const n = parseFloat(v);
+  if (isNaN(n) || n <= 0) return '<span class="odd-na">—</span>';
+  return n.toFixed(2);
+}
+
+
 
 function renderHistoryPanel() {
   const el = document.getElementById('historyPanel');
@@ -746,6 +868,23 @@ function setupEventListeners() {
   });
   document.getElementById('closeSignalMap')?.addEventListener('click', () => {
     document.getElementById('signalMapModal').classList.remove('active');
+  });
+
+  // === MODAL DE ODDS ===
+  // Listener delegado no container do mosaico (células são geradas dinamicamente)
+  document.getElementById('mosaicGridLive')?.addEventListener('click', (e) => {
+    const cell = e.target.closest('.mosaic-cell');
+    if (!cell) return;
+    openOddsModal(App.currentMarket);
+  });
+  document.getElementById('closeOddsModal')?.addEventListener('click', () => {
+    document.getElementById('oddsModal').classList.remove('active');
+  });
+  // Clicar fora do modal também fecha
+  document.getElementById('oddsModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'oddsModal') {
+      document.getElementById('oddsModal').classList.remove('active');
+    }
   });
   document.getElementById('btnAutoSelect')?.addEventListener('click', () => {
     const auto = autoSelectBestDetectors(App.state, App.data, { topN: 5, minSamples: 3 });

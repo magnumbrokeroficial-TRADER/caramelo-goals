@@ -426,6 +426,131 @@ main {
   letter-spacing: 0.05em;
 }
 
+/* ============== MODAL DE ODDS ============== */
+.odds-jogos-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.odds-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.odds-jogo {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.odds-jogo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.odds-jogo-match {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.odds-jogo-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+}
+
+.odds-bookmaker {
+  background: var(--bg-deep);
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.odds-section {
+  margin-bottom: 8px;
+}
+
+.odds-section:last-child { margin-bottom: 0; }
+
+.odds-section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.odds-row {
+  display: flex;
+  gap: 6px;
+}
+
+.odd-cell {
+  flex: 1;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: all 0.15s;
+  cursor: default;
+}
+
+.odd-cell:hover {
+  border-color: var(--accent);
+  background: rgba(255, 181, 71, 0.05);
+}
+
+.odd-cell.over { border-left: 2px solid var(--green); }
+.odd-cell.btts { border-left: 2px solid #a855f7; }
+
+.odd-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.odd-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.odd-na {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.mosaic-cell { cursor: pointer; }
+.mosaic-cell:hover {
+  filter: brightness(1.2);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 /* ============== HISTÓRICO DARKODDS ============== */
 .hdr-source {
   font-size: 10px;
