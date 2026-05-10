@@ -1,0 +1,26 @@
+{
+  "name": "caramelo-goals",
+  "version": "0.2.0",
+  "description": "Sistema de análise técnica para futebol virtual — detecta padrões em séries de gols",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve . -p 8080",
+    "dev": "python3 -m http.server 8080",
+    "lint": "echo 'Add ESLint when migrating to Node backend'"
+  },
+  "keywords": [
+    "trading",
+    "football",
+    "virtual-football",
+    "betting",
+    "technical-analysis",
+    "pattern-detection"
+  ],
+  "author": "Caramelo",
+  "license": "PROPRIETARY",
+  "homepage": "https://caramelotips.com.br",
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.0.0"
+  }
+}
