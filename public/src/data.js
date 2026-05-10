@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3003';
+const API_BASE = 'https://rambling-crafty-riveting.ngrok-free.dev';
 
 async function fetchLiveData() {
   try {
