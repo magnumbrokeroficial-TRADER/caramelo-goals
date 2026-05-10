@@ -6,12 +6,21 @@ let lastFetch = 0;
 async function fetchLiveData() {
   if (cachedLiveData && (Date.now() - lastFetch) < 60000) return cachedLiveData;
   try {
-    const resp = await fetch(`${API_BASE}/api/live`);
+    const resp = await fetch(`${API_BASE}/api/live`, {
+      headers: { 'ngrok-skip-browser-warning': 'true' }
+    });
     cachedLiveData = await resp.json();
     lastFetch = Date.now();
     return cachedLiveData;
   } catch { return null; }
 }
+
+const MARKETS = {
+  copa: { name: 'Copa', icon: '🐱' },
+  euro: { name: 'Euro', icon: '🌍' },
+  super: { name: 'Super', icon: '💥' },
+  premier: { name: 'Premier', icon: '🏴' }
+};
 
 const MOCK_VALUES = [
   43,44,44,46,46,42,40,41,45,46,42,43,45,47,51,54,50,49,52,51,
@@ -29,16 +38,10 @@ function formatChartData(valores) {
 }
 
 function loadMarket(marketKey) {
-  // Tenta usar dados reais se já foram carregados
   const valores = (window.__dadosReais && window.__dadosReais.length > 0) ? window.__dadosReais : MOCK_VALUES;
-  return {
-    key: marketKey,
-    name: marketKey === 'copa' ? 'Copa' : marketKey,
-    data: formatChartData(valores)
-  };
+  return { key: marketKey, name: MARKETS[marketKey]?.name || marketKey, data: formatChartData(valores) };
 }
 
-// Retorna uma grade 2D (array de arrays) como o mosaico espera
 function generateScoresForMosaic(rule, rows = 6, cols = 4) {
   const grid = [];
   for (let r = 0; r < rows; r++) {
@@ -63,14 +66,6 @@ function generateScoresForMosaic(rule, rows = 6, cols = 4) {
   return grid;
 }
 
-// Busca dados reais ao carregar
-fetchLiveData().then(data => {
-  if (data && data.serie_over25 && data.serie_over25.length > 0) {
-    window.__dadosReais = data.serie_over25;
-    console.log('✅ Dados reais carregados:', data.serie_over25.length, 'pontos');
-  }
-});
-
 function generate24hHistory(rule) {
   const hours = [];
   for (let h = 0; h < 24; h++) {
@@ -90,3 +85,10 @@ function generate24hHistory(rule) {
   }
   return hours;
 }
+
+fetchLiveData().then(data => {
+  if (data && data.serie_over25 && data.serie_over25.length > 0) {
+    window.__dadosReais = data.serie_over25;
+    console.log('✅ Dados reais carregados:', data.serie_over25.length, 'pontos');
+  }
+});
