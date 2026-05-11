@@ -49,6 +49,7 @@ async function init() {
   //    podemos trocar essa simulação por polling real:
   //    setInterval(() => loadAndRender(App.currentMarket), 2*60*60*1000);
   startLiveSimulation();
+  autoFixUILabels();
 }
 
 // ====== CARREGA MERCADO E RENDERIZA TUDO ======
@@ -865,6 +866,7 @@ function setupEventListeners() {
     const cfg = ConfigStore.load();
     SignalMap.render(App.accuracyStats || {}, cfg.disabledDetectors || []);
     document.getElementById('signalMapModal').classList.add('active');
+    setTimeout(autoFixUILabels, 100);
   });
   document.getElementById('closeSignalMap')?.addEventListener('click', () => {
     document.getElementById('signalMapModal').classList.remove('active');
@@ -947,6 +949,7 @@ function setupEventListeners() {
   // Modal Configurador
   document.getElementById('btnConfig').addEventListener('click', () => {
     document.getElementById('configModal').classList.add('active');
+    setTimeout(autoFixConfigLabels, 100);
     updateConfigPreview(App.state.values);
   });
   document.getElementById('closeConfig').addEventListener('click', () => {
