@@ -19,6 +19,7 @@
     <button class="market-btn active" data-market="copa">🏆 Copa</button>
     <button class="market-btn" data-market="euro">🌍 Euro</button>
     <button class="market-btn" data-market="super">💥 Super</button>
+    <button class="market-btn" data-market="premier">🏴 Premier</button>
   </div>
   <div class="header-spacer"></div>
   <button class="toolbar-btn" id="btnSignalMap" title="Mapa de Sinais"><span>🗺️</span> Mapa de Sinais</button>
@@ -357,24 +358,6 @@
 </div>
 
 <!-- ===== TOAST DE NOTIFICAÇÃO ===== -->
-<!-- ===== MODAL: ODDS ===== -->
-<div class="modal-overlay" id="oddsModal">
-  <div class="modal modal-wide">
-    <div class="modal-header">
-      <div class="modal-title">💰 Odds Reais — <span id="oddsModalLiga">—</span></div>
-      <button class="modal-close" id="closeOddsModal">✕</button>
-    </div>
-    <div class="modal-body">
-      <p class="modal-intro">
-        Odds reais raspadas da Bet365 via DarkOdds. Atualizadas a cada 2h.
-      </p>
-      <div id="oddsModalContent">
-        <div class="history-loading">Carregando jogos...</div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div id="toastContainer"></div>
 
 <!-- ===== SCRIPTS ===== -->
@@ -389,6 +372,7 @@
 <script src="src/engine.js"></script>
 <script src="src/mosaic.js"></script>
 <script src="src/notifications.js"></script>
+<script src="src/userFeedback.js"></script>
 <script src="src/configurator.js"></script>
 <script src="src/signalMap.js"></script>
 <script src="src/ui.js"></script>

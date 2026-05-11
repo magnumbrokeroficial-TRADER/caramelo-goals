@@ -160,16 +160,3 @@ function renderLegends(state, idx) {
   set('legMom', (state.mom[idx] >= 0 ? '+' : '') + (state.mom[idx]?.toFixed(2) || '--'));
   set('hdrValue', state.values[idx]);
 }
-
-
-// ====== CORREÇÃO AUTOMÁTICA DE LABELS UI (Bingo) ======
-function autoFixUILabels() {
-  document.querySelectorAll('label:not([for])').forEach(label => {
-    const input = label.querySelector('input, select, textarea') || 
-                  label.parentElement?.querySelector('input, select, textarea');
-    if (input) {
-      if (!input.id) input.id = 'ui_' + Math.random().toString(36).substr(2, 6);
-      label.setAttribute('for', input.id);
-    }
-  });
-}

@@ -137,17 +137,3 @@ function updateConfigPreview(values) {
     `;
   }
 }
-
-
-// ====== CORREÇÃO AUTOMÁTICA DE LABELS (Bingo) ======
-function autoFixConfigLabels() {
-  document.querySelectorAll('#configModal label').forEach(label => {
-    if (!label.getAttribute('for')) {
-      const input = label.parentElement.querySelector('input, select');
-      if (input) {
-        if (!input.id) input.id = 'auto_' + Math.random().toString(36).substr(2, 6);
-        label.setAttribute('for', input.id);
-      }
-    }
-  });
-}

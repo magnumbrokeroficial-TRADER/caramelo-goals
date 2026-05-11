@@ -49,13 +49,10 @@ async function init() {
   //    podemos trocar essa simulação por polling real:
   //    setInterval(() => loadAndRender(App.currentMarket), 2*60*60*1000);
   startLiveSimulation();
-  autoFixUILabels();
 }
 
 // ====== CARREGA MERCADO E RENDERIZA TUDO ======
 async function loadAndRender(marketKey) {
-  console.log('[DEBUG] loadAndRender iniciado:', marketKey);
-
   const cfg = ConfigStore.load();
 
   // Mostra spinner enquanto carrega
@@ -64,10 +61,6 @@ async function loadAndRender(marketKey) {
 
   const market = await loadMarket(marketKey);
   App.data = market.data;
-  console.log('[DEBUG] market carregado:', market.name, '| data:', market.data?.length, 'pontos');
-  console.log('[DEBUG] App.data após loadMarket:', App.data?.length, 'pontos');
-  console.log('[DEBUG] App.data[0]:', App.data?.[0]);
-
   App.currentMarket = marketKey;
   App.power = market.power;           // { league_lambda, btts_baseline } da API
   App.dataSource = market.fonte;      // 'api' ou 'fallback'
@@ -77,14 +70,11 @@ async function loadAndRender(marketKey) {
   // Busca histórico em paralelo (não bloqueia)
   fetchHistory(marketKey).then(hist => {
     App.history = hist;
-    renderSignalHistory(App.signals);
+    renderHistoryPanel();
   });
 
   const values = App.data.map(d => d.value);
   App.state = calculateAllIndicators(values, cfg);
-  console.log('[DEBUG] values:', values?.length, 'primeiro:', values?.[0]);
-  console.log('[DEBUG] App.state:', App.state ? 'OK' : 'NULO');
-
 
   // 1. Calcula trendlines + zonas S/R PRIMEIRO (detectores S/R precisam disso)
   App.trendData = computeTrendlinesAndZones(values, {
@@ -148,19 +138,8 @@ async function loadAndRender(marketKey) {
   document.getElementById('scanLabel').textContent = `SCANNER · ${DETECTORS.length} padrões`;
 
   buildCharts();
-  console.log('[DEBUG] chamando buildCharts...');
-  console.log('[DEBUG] mainChart el:', !!document.getElementById('mainChart'));
-  console.log('[DEBUG] rsiChart el:', !!document.getElementById('rsiChart'));
-  console.log('[DEBUG] macdChart el:', !!document.getElementById('macdChart'));
-
   renderAllPanels();
-  console.log('[DEBUG] App.signals:', App.signals?.length, 'sinais');
-  console.log('[DEBUG] renderAllPanels chamado');
-
   renderMosaicGrid();
-  console.log('[DEBUG] renderMosaicGrid chamado');
-  console.log('[DEBUG] mosaicGridLive el:', !!document.getElementById('mosaicGridLive'));
-
 }
 
 function renderAllPanels() {
@@ -216,11 +195,6 @@ const chartCommon = {
 };
 
 function buildCharts() {
-  console.log('[DEBUG] buildCharts iniciado');
-  console.log('[DEBUG] App.data:', App.data?.length, 'pontos');
-  console.log('[DEBUG] App.state.values:', App.state?.values?.length);
-  console.log('[DEBUG] mainChart:', !!document.getElementById('mainChart'));
-
   // Limpa charts antigos se existirem
   if (App.charts.main) App.charts.main.remove();
   if (App.charts.rsi) App.charts.rsi.remove();
@@ -230,7 +204,6 @@ function buildCharts() {
   const rsiEl = document.getElementById('rsiChart');
   const macdEl = document.getElementById('macdChart');
 
-  buildCharts(); renderAllPanels();
   App.charts.main = LightweightCharts.createChart(mainEl, {
     ...chartCommon, width: mainEl.clientWidth, height: mainEl.clientHeight,
   });
@@ -544,130 +517,8 @@ function buildCharts() {
 }
 
 /* ============================================================
-   💰 MODAL DE ODDS — clica no mosaico, mostra jogos reais
+   📚 HISTÓRICO ACUMULADO (DarkOdds)
    ============================================================ */
-
-async function openOddsModal(liga) {
-  const modal = document.getElementById('oddsModal');
-  const content = document.getElementById('oddsModalContent');
-  const ligaLabel = document.getElementById('oddsModalLiga');
-  if (!modal || !content) return;
-
-  // Abre modal em loading
-  ligaLabel.textContent = (MARKETS[liga]?.name || liga).toUpperCase();
-  content.innerHTML = '<div class="history-loading">Carregando jogos…</div>';
-  modal.classList.add('active');
-
-  // Busca odds via API (com cache de 2min)
-  const oddsData = await fetchOdds(liga);
-
-  if (!oddsData || !Array.isArray(oddsData.jogos) || oddsData.jogos.length === 0) {
-    content.innerHTML = `
-      <div class="history-empty">
-        Sem jogos disponíveis para ${liga}.<br>
-        <small>API retornou vazio ou está offline. Cheque o console (F12) pro erro completo.</small>
-      </div>`;
-    return;
-  }
-
-  // Renderiza lista de jogos
-  content.innerHTML = `
-    <div class="odds-jogos-count">${oddsData.jogos.length} jogos disponíveis</div>
-    <div class="odds-list">
-      ${oddsData.jogos.map((j, idx) => renderJogoCard(j, idx)).join('')}
-    </div>
-  `;
-}
-
-// Renderiza um único jogo defensivamente (a estrutura pode variar)
-function renderJogoCard(jogo, idx) {
-  // Tenta extrair info de várias chaves possíveis (defensive parsing)
-  const homeTeam = jogo.home_team || jogo.home || jogo.casa || jogo.time_casa || '—';
-  const awayTeam = jogo.away_team || jogo.away || jogo.fora || jogo.time_fora || '—';
-  const matchName = jogo.match || `${homeTeam} vs ${awayTeam}`;
-  const horario = jogo.time || jogo.start_time || jogo.horario || jogo.commence_time;
-  const horarioFmt = horario ? BR.hm(new Date(horario)) : '—';
-
-  // Odds Over (procura em vários paths)
-  const totals = jogo.totals || jogo.over_under || {};
-  const o25 = pickOdd(totals, ['over25', 'over_2_5', '2.5', 'O2.5', 25]);
-  const o35 = pickOdd(totals, ['over35', 'over_3_5', '3.5', 'O3.5', 35]);
-  const o45 = pickOdd(totals, ['over45', 'over_4_5', '4.5', 'O4.5', 45]);
-
-  // BTTS
-  const btts = jogo.btts || jogo.ambas_marcam || {};
-  const bttsSim = pickOdd(btts, ['yes', 'sim', 'Yes', 'Sim', 'y']);
-  const bttsNao = pickOdd(btts, ['no', 'nao', 'não', 'No', 'Nao', 'n']);
-
-  // 1X2 (Casa / Empate / Fora)
-  const m1x2 = jogo.markets?.['1x2'] || jogo.markets?.matchWinner || jogo.h2h || {};
-  const oddCasa = pickOdd(m1x2, ['home', '1', 'casa']);
-  const oddEmpate = pickOdd(m1x2, ['draw', 'X', 'empate']);
-  const oddFora = pickOdd(m1x2, ['away', '2', 'fora']);
-
-  // Bookmakers (se vier lista, mostra primeiro)
-  const bookmaker = Array.isArray(jogo.bookmakers) && jogo.bookmakers.length > 0
-    ? (jogo.bookmakers[0].name || jogo.bookmakers[0].key || 'Bet365')
-    : (jogo.bookmaker || 'Bet365');
-
-  return `
-    <div class="odds-jogo">
-      <div class="odds-jogo-header">
-        <div class="odds-jogo-match">${matchName}</div>
-        <div class="odds-jogo-meta">
-          <span>🕐 ${horarioFmt}</span>
-          <span class="odds-bookmaker">${bookmaker}</span>
-        </div>
-      </div>
-
-      <div class="odds-section">
-        <div class="odds-section-label">Casa / Empate / Fora</div>
-        <div class="odds-row">
-          <div class="odd-cell"><span class="odd-label">1</span><span class="odd-value">${fmtOdd(oddCasa)}</span></div>
-          <div class="odd-cell"><span class="odd-label">X</span><span class="odd-value">${fmtOdd(oddEmpate)}</span></div>
-          <div class="odd-cell"><span class="odd-label">2</span><span class="odd-value">${fmtOdd(oddFora)}</span></div>
-        </div>
-      </div>
-
-      <div class="odds-section">
-        <div class="odds-section-label">Total de Gols (Over)</div>
-        <div class="odds-row">
-          <div class="odd-cell over"><span class="odd-label">Over 2.5</span><span class="odd-value">${fmtOdd(o25)}</span></div>
-          <div class="odd-cell over"><span class="odd-label">Over 3.5</span><span class="odd-value">${fmtOdd(o35)}</span></div>
-          <div class="odd-cell over"><span class="odd-label">Over 4.5</span><span class="odd-value">${fmtOdd(o45)}</span></div>
-        </div>
-      </div>
-
-      <div class="odds-section">
-        <div class="odds-section-label">Ambas Marcam (BTTS)</div>
-        <div class="odds-row">
-          <div class="odd-cell btts"><span class="odd-label">Sim</span><span class="odd-value">${fmtOdd(bttsSim)}</span></div>
-          <div class="odd-cell btts"><span class="odd-label">Não</span><span class="odd-value">${fmtOdd(bttsNao)}</span></div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Helpers tolerantes ao formato variável da API
-function pickOdd(obj, keys) {
-  if (!obj || typeof obj !== 'object') return null;
-  for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null) {
-      const v = typeof obj[k] === 'object' ? (obj[k].odd || obj[k].price || obj[k].value) : obj[k];
-      if (v !== undefined && v !== null) return v;
-    }
-  }
-  return null;
-}
-
-function fmtOdd(v) {
-  const n = parseFloat(v);
-  if (isNaN(n) || n <= 0) return '<span class="odd-na">—</span>';
-  return n.toFixed(2);
-}
-
-
 
 function renderHistoryPanel() {
   const el = document.getElementById('historyPanel');
@@ -892,27 +743,9 @@ function setupEventListeners() {
     const cfg = ConfigStore.load();
     SignalMap.render(App.accuracyStats || {}, cfg.disabledDetectors || []);
     document.getElementById('signalMapModal').classList.add('active');
-    setTimeout(autoFixUILabels, 100);
   });
   document.getElementById('closeSignalMap')?.addEventListener('click', () => {
     document.getElementById('signalMapModal').classList.remove('active');
-  });
-
-  // === MODAL DE ODDS ===
-  // Listener delegado no container do mosaico (células são geradas dinamicamente)
-  document.getElementById('mosaicGridLive')?.addEventListener('click', (e) => {
-    const cell = e.target.closest('.mosaic-cell');
-    if (!cell) return;
-    openOddsModal(App.currentMarket);
-  });
-  document.getElementById('closeOddsModal')?.addEventListener('click', () => {
-    document.getElementById('oddsModal').classList.remove('active');
-  });
-  // Clicar fora do modal também fecha
-  document.getElementById('oddsModal')?.addEventListener('click', (e) => {
-    if (e.target.id === 'oddsModal') {
-      document.getElementById('oddsModal').classList.remove('active');
-    }
   });
   document.getElementById('btnAutoSelect')?.addEventListener('click', () => {
     const auto = autoSelectBestDetectors(App.state, App.data, { topN: 5, minSamples: 3 });
@@ -942,9 +775,6 @@ function setupEventListeners() {
   document.getElementById('mosaicHoursSelect')?.addEventListener('change', e => {
     App.mosaicHours = parseInt(e.target.value);
     renderMosaicGrid();
-  console.log('[DEBUG] renderMosaicGrid chamado');
-  console.log('[DEBUG] mosaicGridLive el:', !!document.getElementById('mosaicGridLive'));
-
   });
 
   // Toggles do mosaico (Times, Odds)
@@ -978,7 +808,6 @@ function setupEventListeners() {
   // Modal Configurador
   document.getElementById('btnConfig').addEventListener('click', () => {
     document.getElementById('configModal').classList.add('active');
-    setTimeout(autoFixConfigLabels, 100);
     updateConfigPreview(App.state.values);
   });
   document.getElementById('closeConfig').addEventListener('click', () => {
@@ -1134,9 +963,6 @@ function startLiveSimulation() {
     const values = App.data.map(d => d.value);
     const cfg = ConfigStore.load();
     App.state = calculateAllIndicators(values, cfg);
-  console.log('[DEBUG] values:', values?.length, 'primeiro:', values?.[0]);
-  console.log('[DEBUG] App.state:', App.state ? 'OK' : 'NULO');
-
     const rawSignals = scanAllPatterns(App.state, App.data, cfg.minConfidence);
     App.signals = dedupeSignals(rawSignals, cfg.signalSpacing || 4, cfg.maxMarkers || 25);
     App.btResults = backtestSignals(App.signals, values, cfg.backtestHorizon);
@@ -1186,13 +1012,7 @@ function startLiveSimulation() {
     refreshMarkers();
 
     renderAllPanels();
-  console.log('[DEBUG] App.signals:', App.signals?.length, 'sinais');
-  console.log('[DEBUG] renderAllPanels chamado');
-
     renderMosaicGrid();
-  console.log('[DEBUG] renderMosaicGrid chamado');
-  console.log('[DEBUG] mosaicGridLive el:', !!document.getElementById('mosaicGridLive'));
-
 
     // Atualiza a barra UTC depois que tudo foi recalculado
     requestAnimationFrame(updateUTCTimeBar);
@@ -1318,8 +1138,5 @@ function startFooterClock() {
 // ====== START ======
 document.addEventListener('DOMContentLoaded', () => {
   init();
-setTimeout(() => { buildCharts(); renderAllPanels(); renderMosaicGrid(); }, 1000);
   startFooterClock();
 });
-
-window.renderHistoryPanel = renderSignalHistory;
