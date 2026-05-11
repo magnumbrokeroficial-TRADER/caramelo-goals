@@ -230,6 +230,7 @@ function buildCharts() {
   const rsiEl = document.getElementById('rsiChart');
   const macdEl = document.getElementById('macdChart');
 
+  buildCharts(); renderAllPanels();
   App.charts.main = LightweightCharts.createChart(mainEl, {
     ...chartCommon, width: mainEl.clientWidth, height: mainEl.clientHeight,
   });
@@ -1317,5 +1318,8 @@ function startFooterClock() {
 // ====== START ======
 document.addEventListener('DOMContentLoaded', () => {
   init();
+setTimeout(() => { buildCharts(); renderAllPanels(); renderMosaicGrid(); }, 1000);
   startFooterClock();
 });
+
+window.renderHistoryPanel = renderSignalHistory;
