@@ -54,6 +54,8 @@ async function init() {
 
 // ====== CARREGA MERCADO E RENDERIZA TUDO ======
 async function loadAndRender(marketKey) {
+  console.log('[DEBUG] loadAndRender iniciado:', marketKey);
+
   const cfg = ConfigStore.load();
 
   // Mostra spinner enquanto carrega
@@ -62,6 +64,10 @@ async function loadAndRender(marketKey) {
 
   const market = await loadMarket(marketKey);
   App.data = market.data;
+  console.log('[DEBUG] market carregado:', market.name, '| data:', market.data?.length, 'pontos');
+  console.log('[DEBUG] App.data após loadMarket:', App.data?.length, 'pontos');
+  console.log('[DEBUG] App.data[0]:', App.data?.[0]);
+
   App.currentMarket = marketKey;
   App.power = market.power;           // { league_lambda, btts_baseline } da API
   App.dataSource = market.fonte;      // 'api' ou 'fallback'
@@ -76,6 +82,9 @@ async function loadAndRender(marketKey) {
 
   const values = App.data.map(d => d.value);
   App.state = calculateAllIndicators(values, cfg);
+  console.log('[DEBUG] values:', values?.length, 'primeiro:', values?.[0]);
+  console.log('[DEBUG] App.state:', App.state ? 'OK' : 'NULO');
+
 
   // 1. Calcula trendlines + zonas S/R PRIMEIRO (detectores S/R precisam disso)
   App.trendData = computeTrendlinesAndZones(values, {
@@ -139,8 +148,19 @@ async function loadAndRender(marketKey) {
   document.getElementById('scanLabel').textContent = `SCANNER · ${DETECTORS.length} padrões`;
 
   buildCharts();
+  console.log('[DEBUG] chamando buildCharts...');
+  console.log('[DEBUG] mainChart el:', !!document.getElementById('mainChart'));
+  console.log('[DEBUG] rsiChart el:', !!document.getElementById('rsiChart'));
+  console.log('[DEBUG] macdChart el:', !!document.getElementById('macdChart'));
+
   renderAllPanels();
+  console.log('[DEBUG] App.signals:', App.signals?.length, 'sinais');
+  console.log('[DEBUG] renderAllPanels chamado');
+
   renderMosaicGrid();
+  console.log('[DEBUG] renderMosaicGrid chamado');
+  console.log('[DEBUG] mosaicGridLive el:', !!document.getElementById('mosaicGridLive'));
+
 }
 
 function renderAllPanels() {
@@ -196,6 +216,11 @@ const chartCommon = {
 };
 
 function buildCharts() {
+  console.log('[DEBUG] buildCharts iniciado');
+  console.log('[DEBUG] App.data:', App.data?.length, 'pontos');
+  console.log('[DEBUG] App.state.values:', App.state?.values?.length);
+  console.log('[DEBUG] mainChart:', !!document.getElementById('mainChart'));
+
   // Limpa charts antigos se existirem
   if (App.charts.main) App.charts.main.remove();
   if (App.charts.rsi) App.charts.rsi.remove();
@@ -916,6 +941,9 @@ function setupEventListeners() {
   document.getElementById('mosaicHoursSelect')?.addEventListener('change', e => {
     App.mosaicHours = parseInt(e.target.value);
     renderMosaicGrid();
+  console.log('[DEBUG] renderMosaicGrid chamado');
+  console.log('[DEBUG] mosaicGridLive el:', !!document.getElementById('mosaicGridLive'));
+
   });
 
   // Toggles do mosaico (Times, Odds)
@@ -1105,6 +1133,9 @@ function startLiveSimulation() {
     const values = App.data.map(d => d.value);
     const cfg = ConfigStore.load();
     App.state = calculateAllIndicators(values, cfg);
+  console.log('[DEBUG] values:', values?.length, 'primeiro:', values?.[0]);
+  console.log('[DEBUG] App.state:', App.state ? 'OK' : 'NULO');
+
     const rawSignals = scanAllPatterns(App.state, App.data, cfg.minConfidence);
     App.signals = dedupeSignals(rawSignals, cfg.signalSpacing || 4, cfg.maxMarkers || 25);
     App.btResults = backtestSignals(App.signals, values, cfg.backtestHorizon);
@@ -1154,7 +1185,13 @@ function startLiveSimulation() {
     refreshMarkers();
 
     renderAllPanels();
+  console.log('[DEBUG] App.signals:', App.signals?.length, 'sinais');
+  console.log('[DEBUG] renderAllPanels chamado');
+
     renderMosaicGrid();
+  console.log('[DEBUG] renderMosaicGrid chamado');
+  console.log('[DEBUG] mosaicGridLive el:', !!document.getElementById('mosaicGridLive'));
+
 
     // Atualiza a barra UTC depois que tudo foi recalculado
     requestAnimationFrame(updateUTCTimeBar);
