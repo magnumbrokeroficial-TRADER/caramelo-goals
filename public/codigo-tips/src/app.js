@@ -71,7 +71,7 @@ async function loadAndRender(marketKey) {
   // Busca histórico em paralelo (não bloqueia)
   fetchHistory(marketKey).then(hist => {
     App.history = hist;
-    renderHistoryPanel();
+    renderSignalHistory(App.signals);
   });
 
   const values = App.data.map(d => d.value);
