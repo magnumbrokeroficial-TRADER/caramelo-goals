@@ -712,6 +712,7 @@ function setupEventListeners() {
   document.getElementById('tgMomentum')?.addEventListener('change', e => {
     document.getElementById('macdChart').parentElement.style.display = e.target.checked ? '' : 'none';
   });
+  document.getElementById('tgMACD').checked = true;
   document.getElementById('tgMACD')?.addEventListener('change', e => {
     if (App.series.macdSignal) {
       App.series.macdSignal.applyOptions({ visible: e.target.checked });
@@ -775,6 +776,7 @@ function setupEventListeners() {
   // Dropdown de horas do mosaico
   document.getElementById('mosaicHoursSelect')?.addEventListener('change', e => {
     App.mosaicHours = parseInt(e.target.value);
+    e.target.value = App.mosaicHours;
     renderMosaicGrid();
   });
 
@@ -785,13 +787,8 @@ function setupEventListeners() {
   // Dropdown Qtd. Jogos (zoom inicial / janela de dados)
   document.getElementById('qtdJogosSelect')?.addEventListener('change', e => {
     App.qtdJogos = parseInt(e.target.value);
-    // Reajusta o zoom do gráfico pra mostrar apenas os últimos N jogos
-    if (App.data && App.data.length > 0) {
-      const lastTime = App.data[App.data.length - 1].time;
-      const points = Math.min(App.qtdJogos, App.data.length);
-      const startTime = App.data[App.data.length - points].time;
-      App.charts.main.timeScale().setVisibleRange({ from: startTime, to: lastTime });
-    }
+    window.TOTAL_ROUNDS_24H = App.qtdJogos;
+    loadAndRender(App.currentMarket);
   });
 
   // Botão "Limpar Tudo" (desliga todos os toggles do gráfico)

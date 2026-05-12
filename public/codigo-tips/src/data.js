@@ -273,7 +273,8 @@ async function loadMarket(marketKey = 'copa') {
   if (live && Array.isArray(live.serie_over25) && live.serie_over25.length > 0) {
     // Pegamos os 80 pontos reais e estendemos pra trás
     const realPoints = live.serie_over25.map(v => Number(v) * 20).filter(v => !isNaN(v));
-    values = extendBackTo24h(realPoints, TOTAL_ROUNDS_24H);
+    const useRounds = window.TOTAL_ROUNDS_24H || TOTAL_ROUNDS_24H;
+    values = extendBackTo24h(realPoints, useRounds);
     power = live.power || null;
     atualizado = live.atualizado || null;
     fonte = 'api';
