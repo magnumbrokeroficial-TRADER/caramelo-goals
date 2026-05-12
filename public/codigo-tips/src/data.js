@@ -72,6 +72,16 @@ function extendBackTo24h(realValues, totalRounds = 360, anchorHour = null) {
   const mean = realValues.reduce((s, v) => s + v, 0) / realValues.length;
   const variance = realValues.reduce((s, v) => s + (v - mean) ** 2, 0) / realValues.length;
   const std = Math.sqrt(variance);
+  const dataMin = Math.min(...realValues);
+  const dataMax = Math.max(...realValues);
+  const dataRange = dataMax - dataMin;
+
+  // Clamp adaptativo: mantém os pontos sintéticos numa faixa
+  // ~30% maior que a amplitude dos dados reais, pra permitir
+  // oscilação natural sem distorcer a escala do gráfico
+  const padding = Math.max(dataRange * 0.3, std * 2);
+  const clampMin = Math.max(0, dataMin - padding);
+  const clampMax = dataMax + padding;
 
   // PRNG determinístico (seed = hash dos primeiros valores reais)
   let s = realValues.slice(0, 5).reduce((a, b) => a + b * 7919, 0);
@@ -100,11 +110,12 @@ function extendBackTo24h(realValues, totalRounds = 360, anchorHour = null) {
     // Hora do dia naquele momento (Brasília)
     const hourAtPoint = (nowHourBR - hoursBefore + 48) % 24;
 
-    // Viés por horário
+    // Viés por horário (escalado proporcionalmente ao desvio padrão)
     let hourBias = 0;
-    if (hourAtPoint >= 0 && hourAtPoint < 5) hourBias = -3;       // madrugada
-    else if (hourAtPoint >= 5 && hourAtPoint < 9) hourBias = -1;  // manhã cedo
-    else if (hourAtPoint >= 20 && hourAtPoint < 24) hourBias = 2; // pico noturno
+    const biasScale = Math.max(0.3, std * 0.5);
+    if (hourAtPoint >= 0 && hourAtPoint < 5) hourBias = -3 * biasScale;       // madrugada
+    else if (hourAtPoint >= 5 && hourAtPoint < 9) hourBias = -1 * biasScale;  // manhã cedo
+    else if (hourAtPoint >= 20 && hourAtPoint < 24) hourBias = 2 * biasScale; // pico noturno
     else hourBias = 0;
 
     // Random walk reverso: tende a oscilar em torno de (mean + hourBias)
@@ -112,14 +123,14 @@ function extendBackTo24h(realValues, totalRounds = 360, anchorHour = null) {
     const noise = (rand() - 0.5) * std * 1.4;
     const drift = (rand() - 0.5) * 2;
     v = v + drift + (target - v) * 0.18 + noise * 0.5;
-    v = Math.max(20, Math.min(70, v));
-    generated[i] = Math.round(v);
+    v = Math.max(clampMin, Math.min(clampMax, v));
+    generated[i] = parseFloat(v.toFixed(2));
   }
 
   // Suavização da junção: força o último ponto sintético a ser
-  // exatamente o primeiro real - 1 (transição limpa)
-  const transitionTarget = realValues[0] + Math.round((rand() - 0.5) * 2);
-  generated[needed - 1] = transitionTarget;
+  // próximo do primeiro real (transição limpa)
+  const transitionTarget = realValues[0] + (rand() - 0.5) * Math.max(0.2, std * 0.5);
+  generated[needed - 1] = parseFloat(transitionTarget.toFixed(2));
 
   return [...generated, ...realValues];
 }
@@ -261,7 +272,7 @@ async function loadMarket(marketKey = 'copa') {
 
   if (live && Array.isArray(live.serie_over25) && live.serie_over25.length > 0) {
     // Pegamos os 80 pontos reais e estendemos pra trás
-    const realPoints = live.serie_over25.map(v => Math.round(Number(v))).filter(v => !isNaN(v));
+    const realPoints = live.serie_over25.map(v => Number(v)).filter(v => !isNaN(v));
     values = extendBackTo24h(realPoints, TOTAL_ROUNDS_24H);
     power = live.power || null;
     atualizado = live.atualizado || null;
