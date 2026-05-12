@@ -1,6 +1,6 @@
 {
   "name": "caramelo-goals",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Sistema de análise técnica para futebol virtual — detecta padrões, trendlines e zonas S/R em séries de gols",
   "main": "index.html",
   "scripts": {
