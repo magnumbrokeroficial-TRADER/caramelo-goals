@@ -69,10 +69,7 @@ async function loadAndRender(marketKey) {
   App.realPointCount = market.realCount || 0;
 
   // Busca histórico em paralelo (não bloqueia)
-  fetchHistory(marketKey).then(hist => {
-    App.history = hist;
-    renderHistoryPanel();
-  });
+  fetchHistory();
 
   const values = App.data.map(d => d.value);
   App.state = calculateAllIndicators(values, cfg);
