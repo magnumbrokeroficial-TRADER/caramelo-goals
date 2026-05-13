@@ -52,4 +52,3 @@ async function loadMarket(marketKey) {
     return null; // vai cair no fallback do REAL_DATA
   }
 }
-EOF

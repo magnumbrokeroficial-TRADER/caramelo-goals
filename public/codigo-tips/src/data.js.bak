@@ -258,7 +258,42 @@ function buildSeries(values, startTime) {
  * Retorno: { name, icon, data, power, atualizado, fonte }
  *   fonte: 'api' (dados reais) ou 'fallback' (mock)
  */
+async function loadMarket(marketKey = 'copa') {
+  const fallback = MARKETS_FALLBACK[marketKey] || MARKETS_FALLBACK.copa;
+  const now = new Date();
 
+  // Tenta buscar da API
+  const live = await fetchLive(marketKey);
+
+  let values;
+  let power = null;
+  let atualizado = null;
+  let fonte = 'fallback';
+
+  if (live && Array.isArray(live.serie_over25) && live.serie_over25.length > 0) {
+    // Pegamos os 80 pontos reais e estendemos pra trás
+    const realPoints = live.serie_over25.map(v => Number(v) * 20).filter(v => !isNaN(v));
+    const useRounds = window.TOTAL_ROUNDS_24H || TOTAL_ROUNDS_24H;
+    values = extendBackTo24h(realPoints, useRounds);
+    power = live.power || null;
+    atualizado = live.atualizado || null;
+    fonte = 'api';
+  } else {
+    values = fallback.values;
+  }
+
+  const startTime = new Date(now.getTime() - (values.length - 1) * 240 * 1000);
+
+  return {
+    name: fallback.name,
+    icon: fallback.icon,
+    data: buildSeries(values, startTime),
+    power,         // { league_lambda, btts_baseline } ou null
+    atualizado,    // ISO timestamp ou null
+    fonte,         // 'api' ou 'fallback'
+    realCount: live ? live.serie_over25?.length : 0, // quantos pontos são reais (no fim)
+  };
+}
 
 // ============================================================
 // 🎲 SIMULADOR DE PLACARES PARA O MOSAICO
@@ -359,58 +394,3 @@ function generate24hHistory(rule = (s => (s.home + s.away) >= 3), gamesPerHour =
   return hours;
 }
 // deploy 1778556672
-
-// Nova função loadMarket usando PulseScore API
-async function loadMarket(marketKey) {
-  const leagues = {
-    copa: "The Americas||Copa do Brasil",
-    euro: "Europe||UEFA Champions League",   // ajuste conforme necessário
-    super: "Europe||UEFA Europa League",     // idem
-    premier: "England||Premier League"       // idem
-  };
-  const league = leagues[marketKey] || leagues.copa;
-  const url = `https://api.pulsescore.net/api/v2/bet365/events?league=${encodeURIComponent(league)}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: { 'x-secret': '1e1d3860-2788-4599-9c3a-280fc3c53d6f' }
-    });
-    const events = await response.json();
-
-    const overValues = [];
-    for (const event of events) {
-      for (const tab of event.tabs || []) {
-        for (const mg of tab.mg || []) {
-          if (mg.name === 'Goal Line') {
-            for (const ma of mg.ma || []) {
-              if (ma.name === 'Over' && ma.pa && ma.pa.length > 0) {
-                const odd = ma.pa[0].decimal; // ex: 1.825
-                const impliedGoals = (1 / odd) * 5;
-                overValues.push(impliedGoals);
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Suaviza para 80 pontos (média móvel simples, por exemplo)
-    const serie_over25 = [];
-    const windowSize = Math.min(overValues.length, 20);
-    for (let i = 0; i < overValues.length; i++) {
-      const slice = overValues.slice(Math.max(0, i - windowSize + 1), i + 1);
-      const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
-      serie_over25.push(avg);
-    }
-
-    return {
-      serie_over25: serie_over25,
-      power: null,
-      atualizado: new Date().toISOString()
-    };
-  } catch (err) {
-    console.error('Erro na API PulseScore, usando fallback mock:', err);
-    return null; // vai cair no fallback do REAL_DATA
-  }
-}
