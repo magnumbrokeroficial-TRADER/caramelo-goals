@@ -519,8 +519,20 @@ function buildCharts() {
 }
 
 /* ============================================================
-   📚 HISTÓRICO ACUMULADO (DarkOdds)
+   📚 HISTÓRICO ACUMULADO (PulseScore / App.data)
    ============================================================ */
+
+function fetchHistory() {
+  const panel = document.getElementById('historyPanel');
+  if (!panel) return;
+  if (App.data && App.data.length) {
+    const recent = App.data.slice(-20).map(d => d.value);
+    panel.innerHTML = '<h3>Histórico Acumulado (PulseScore)</h3><ul>' +
+      recent.map(v => '<li>' + v + '</li>').join('') + '</ul>';
+  } else {
+    panel.innerHTML = '<p>Carregando histórico...</p>';
+  }
+}
 
 function renderHistoryPanel() {
   const el = document.getElementById('historyPanel');
