@@ -192,6 +192,7 @@ const chartCommon = {
   },
   localization: {
     timeFormatter: (time) => BR.hm(time),
+    priceFormatter: price => Math.round(price).toString(),
   },
 };
 
