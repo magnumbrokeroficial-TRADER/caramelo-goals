@@ -33,7 +33,7 @@ async function init() {
   //    se a API estiver lenta)
   setupEventListeners();
 
-  // 3. Carrega mercado inicial (copa) — aguarda fetch da API DarkOdds
+  // 3. Carrega mercado inicial (copa) — aguarda fetch da API PulseScore
   await loadAndRender(App.currentMarket);
 
   // Pré-popula cache de sinais notificados com TODOS os sinais
@@ -124,7 +124,7 @@ async function loadAndRender(marketKey) {
 
   // Atualiza header com fonte de dados
   const sourceTag = market.fonte === 'api'
-    ? `🟢 DarkOdds · ${market.realCount}pts reais`
+    ? `🟢 PulseScore · ${market.realCount}pts reais`
     : `🟡 Mock (API offline)`;
   const updatedTag = market.atualizado
     ? ` · atualizado ${BR.hm(new Date(market.atualizado))}`

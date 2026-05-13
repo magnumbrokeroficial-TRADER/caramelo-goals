@@ -136,7 +136,7 @@ function extendBackTo24h(realValues, totalRounds = 360, anchorHour = null) {
 }
 
 // ============================================================
-// 🔌 INTEGRAÇÃO DARKODDS
+// 🔌 INTEGRAÇÃO PulseScore
 // ============================================================
 // Backend Node.js que serve dados reais raspados da Bet365.
 // Atualizado a cada 2h. Endpoints:
@@ -175,14 +175,14 @@ async function fetchLive(liga = 'copa') {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     apiCache.live[liga] = { data, timestamp: Date.now() };
-    console.log(`[DarkOdds] /api/live?liga=${liga}:`, {
+    console.log(`[PulseScore] /api/live?liga=${liga}:`, {
       pontos: data.serie_over25?.length,
       power: data.power,
       atualizado: data.atualizado,
     });
     return data;
   } catch (err) {
-    console.warn(`[DarkOdds] Falha em /api/live?liga=${liga}, usando fallback:`, err.message);
+    console.warn(`[PulseScore] Falha em /api/live?liga=${liga}, usando fallback:`, err.message);
     return null;
   }
 }
@@ -198,10 +198,10 @@ async function fetchHistory(liga = 'copa') {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     apiCache.history[liga] = { data, timestamp: Date.now() };
-    console.log(`[DarkOdds] /api/history?liga=${liga}:`, { registros: data.dados?.length });
+    console.log(`[PulseScore] /api/history?liga=${liga}:`, { registros: data.dados?.length });
     return data;
   } catch (err) {
-    console.warn(`[DarkOdds] Falha em /api/history?liga=${liga}:`, err.message);
+    console.warn(`[PulseScore] Falha em /api/history?liga=${liga}:`, err.message);
     return null;
   }
 }
@@ -217,10 +217,10 @@ async function fetchOdds(liga = 'super') {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     apiCache.odds[liga] = { data, timestamp: Date.now() };
-    console.log(`[DarkOdds] /api/odds?liga=${liga}:`, { jogos: data.jogos?.length });
+    console.log(`[PulseScore] /api/odds?liga=${liga}:`, { jogos: data.jogos?.length });
     return data;
   } catch (err) {
-    console.warn(`[DarkOdds] Falha em /api/odds?liga=${liga}:`, err.message);
+    console.warn(`[PulseScore] Falha em /api/odds?liga=${liga}:`, err.message);
     return null;
   }
 }
