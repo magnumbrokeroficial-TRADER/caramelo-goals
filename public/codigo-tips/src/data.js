@@ -364,17 +364,15 @@ function generate24hHistory(rule = (s => (s.home + s.away) >= 3), gamesPerHour =
 async function loadMarket(marketKey) {
   const leagues = {
     copa: "The Americas||Copa do Brasil",
-    euro: "Europe||UEFA Champions League",   // ajuste conforme necessário
-    super: "Europe||UEFA Europa League",     // idem
-    premier: "England||Premier League"       // idem
+    euro: "UEFA Competitions||UEFA Champions League",
+    super: "UEFA Competitions||UEFA Europa League",
+    premier: "United Kingdom||England Premier League"
   };
   const league = leagues[marketKey] || leagues.copa;
-  const url = `https://api.pulsescore.net/api/v2/bet365/events?league=${encodeURIComponent(league)}`;
+  const url = `/api/pulse?league=${encodeURIComponent(league)}`;
 
   try {
-    const response = await fetch(url, {
-      headers: { 'x-secret': '1e1d3860-2788-4599-9c3a-280fc3c53d6f' }
-    });
+    const response = await fetch(url);
     const events = await response.json();
 
     const overValues = [];
