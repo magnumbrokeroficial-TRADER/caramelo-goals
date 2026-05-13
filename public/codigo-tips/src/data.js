@@ -401,7 +401,7 @@ async function loadMarket(marketKey) {
     for (let i = 0; i < overValues.length; i++) {
       const slice = overValues.slice(Math.max(0, i - windowSize + 1), i + 1);
       const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
-      serie_over25.push(avg);
+      serie_over25.push(Math.round(avg));
     }
 
     return {
