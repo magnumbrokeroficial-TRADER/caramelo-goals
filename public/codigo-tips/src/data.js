@@ -360,31 +360,36 @@ function generate24hHistory(rule = (s => (s.home + s.away) >= 3), gamesPerHour =
 }
 // deploy 1778556672
 
-// Nova função loadMarket usando PulseScore API
-async function loadMarket(marketKey) {
+async function loadMarket(marketKey = 'copa') {
+  const fallback = MARKETS_FALLBACK[marketKey] || MARKETS_FALLBACK.copa;
+  const now = new Date();
   const leagues = {
     copa: "The Americas||Copa do Brasil",
     euro: "UEFA Competitions||UEFA Champions League",
     super: "UEFA Competitions||UEFA Europa League",
     premier: "United Kingdom||England Premier League"
   };
-  const league = leagues[marketKey] || leagues.copa;
-  const url = `/api/pulse?league=${encodeURIComponent(league)}`;
 
   try {
-    const response = await fetch(url);
-    const events = await response.json();
+    const league = leagues[marketKey] || leagues.copa;
+    const res = await fetch(`/api/pulse?league=${encodeURIComponent(league)}`);
 
-    const overValues = [];
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const events = await res.json();
+    if (!Array.isArray(events) || events.length === 0) throw new Error('Nenhum evento');
+
+    // Extrai implied goals do Goal Line Over de cada evento
+    const rawValues = [];
     for (const event of events) {
       for (const tab of event.tabs || []) {
         for (const mg of tab.mg || []) {
           if (mg.name === 'Goal Line') {
             for (const ma of mg.ma || []) {
               if (ma.name === 'Over' && ma.pa && ma.pa.length > 0) {
-                const odd = ma.pa[0].decimal; // ex: 1.825
-                const impliedGoals = (1 / odd) * 5;
-                overValues.push(impliedGoals);
+                const odd = parseFloat(ma.pa[0].decimal);
+                if (!isNaN(odd) && odd > 0) {
+                  rawValues.push(Math.round((1 / odd) * 100));
+                }
                 break;
               }
             }
@@ -393,22 +398,42 @@ async function loadMarket(marketKey) {
       }
     }
 
-    // Suaviza para 80 pontos (média móvel simples, por exemplo)
-    const serie_over25 = [];
-    const windowSize = Math.min(overValues.length, 20);
-    for (let i = 0; i < overValues.length; i++) {
-      const slice = overValues.slice(Math.max(0, i - windowSize + 1), i + 1);
+    if (rawValues.length === 0) throw new Error('Nenhum valor Goal Line extraído');
+
+    // Suaviza com média móvel
+    const smoothed = [];
+    const windowSize = Math.min(rawValues.length, 20);
+    for (let i = 0; i < rawValues.length; i++) {
+      const slice = rawValues.slice(Math.max(0, i - windowSize + 1), i + 1);
       const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
-      serie_over25.push(Math.round(avg));
+      smoothed.push(Math.round(avg));
     }
 
+    const useRounds = window.TOTAL_ROUNDS_24H || TOTAL_ROUNDS_24H;
+    const values = extendBackTo24h(smoothed, useRounds);
+    const startTime = new Date(now.getTime() - (values.length - 1) * 240 * 1000);
+
     return {
-      serie_over25: serie_over25,
+      name: fallback.name,
+      icon: fallback.icon,
+      data: buildSeries(values, startTime),
       power: null,
-      atualizado: new Date().toISOString()
+      atualizado: new Date().toISOString(),
+      fonte: 'api',
+      realCount: smoothed.length,
     };
   } catch (err) {
-    console.error('Erro na API PulseScore, usando fallback mock:', err);
-    return null; // vai cair no fallback do REAL_DATA
+    console.warn('PulseScore indisponível, usando fallback:', err.message);
+    const values = fallback.values;
+    const startTime = new Date(now.getTime() - (values.length - 1) * 240 * 1000);
+    return {
+      name: fallback.name,
+      icon: fallback.icon,
+      data: buildSeries(values, startTime),
+      power: null,
+      atualizado: null,
+      fonte: 'fallback',
+      realCount: 0,
+    };
   }
 }

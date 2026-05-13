@@ -61,23 +61,12 @@ async function loadAndRender(marketKey) {
   if (hdrEl) hdrEl.textContent = '⏳ Carregando...';
 
   const market = await loadMarket(marketKey);
-  if (!market) {
-    console.warn('loadMarket retornou null, usando fallback mock');
-    const fallback = REAL_DATA[marketKey] || REAL_DATA.copa;
-    App.data = fallback.data;
-    App.currentMarket = marketKey;
-    App.power = null;
-    App.dataSource = 'fallback';
-    App.dataUpdated = new Date().toISOString();
-    App.realPointCount = 0;
-  } else {
-    App.data = market.data;
-    App.currentMarket = marketKey;
-    App.power = market.power;           // { league_lambda, btts_baseline } da API
-    App.dataSource = market.fonte;      // 'api' ou 'fallback'
-    App.dataUpdated = market.atualizado; // ISO timestamp
-    App.realPointCount = market.realCount || 0;
-  }
+  App.data = market.data;
+  App.currentMarket = marketKey;
+  App.power = market.power;
+  App.dataSource = market.fonte;
+  App.dataUpdated = market.atualizado;
+  App.realPointCount = market.realCount || 0;
 
   // Busca histórico em paralelo (não bloqueia)
   fetchHistory(marketKey).then(hist => {
