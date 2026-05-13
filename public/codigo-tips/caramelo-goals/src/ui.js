@@ -58,7 +58,7 @@ function renderIndicators(state, idx) {
     <div class="indicator-row"><span class="ind-label">📈 RSI</span><span class="ind-value" style="color:${rsiColor}">${r?.toFixed(1) || '--'}</span></div>
     <div class="indicator-row"><span class="ind-label">⚡ Momento</span><span class="ind-value" style="color:${momColor}">${(m > 0 ? '+' : '') + (m?.toFixed(2) || '--')}</span></div>
     <div class="indicator-row"><span class="ind-label">📍 Posição na banda</span><span class="ind-value" style="color:${posColor}">${pos.toFixed(0)}%</span></div>
-    <div class="indicator-row"><span class="ind-label">📏 MM rápida / lenta</span><span class="ind-value">${state.mm9[idx]?.toFixed(1) || '--'} / ${state.mm21[idx]?.toFixed(1) || '--'}</span></div>
+    <!-- MM9 removida -->
   `;
 }
 
@@ -153,7 +153,7 @@ function renderBacktest(signals, btResults) {
 function renderLegends(state, idx) {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   set('legGols', state.values[idx]);
-  set('legMA9', state.mm9[idx]?.toFixed(1) || '--');
+  // MM9 removida
   set('legUp', state.bands.upper[idx]?.toFixed(1) || '--');
   set('legLow', state.bands.lower[idx]?.toFixed(1) || '--');
   set('legRSI', state.rsi[idx]?.toFixed(1) || '--');

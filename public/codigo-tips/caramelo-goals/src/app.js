@@ -65,7 +65,7 @@ const App = {
   mosaicGrid: null,     // grid de placares do mosaico
   markers: [],          // marcadores no gráfico (setas dos sinais)
   charts: { main: null, rsi: null, macd: null },
-  series: { goals: null, ma9: null, upper: null, middle: null, lower: null, rsi: null, macd: null },
+  series: { goals: null, vwap: null, upper: null, middle: null, lower: null, rsi: null, macd: null },
   notifiedSignals: new Set(), // evitar notificar o mesmo sinal duas vezes
 };
 
@@ -303,9 +303,16 @@ function buildCharts() {
   App.series.middle.setData(App.state.bands.middle.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
   App.series.lower.setData(App.state.bands.lower.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
 
-  // MM rápida
-  App.series.ma9 = App.charts.main.addLineSeries({ color: '#facc15', lineWidth: 2, priceLineVisible: false });
-  App.series.ma9.setData(App.state.mm9.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
+  // MM9 removida
+
+  // VWAP (média 50 períodos, roxa, sem números)
+  App.series.vwap = App.charts.main.addLineSeries({
+    color: '#a855f7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+  });
+  App.series.vwap.applyOptions({
+    priceFormat: { type: 'custom', minMove: 1, formatter: price => '' }
+  });
+  App.series.vwap.setData(App.state.vwap.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
 
   // Linha principal de gols
   App.series.goals = App.charts.main.addLineSeries({
@@ -900,9 +907,6 @@ function setupEventListeners() {
   });
 
   // Toggles de exibição (Médias, Bandas, RSI, Marcadores, Trendlines, Zonas, Números)
-  document.getElementById('tgMA')?.addEventListener('change', e => {
-    if (App.series.ma9) App.series.ma9.applyOptions({ visible: e.target.checked });
-  });
   document.getElementById('tgBands')?.addEventListener('change', e => {
     const v = e.target.checked;
     ['upper','middle','lower'].forEach(k => App.series[k]?.applyOptions({ visible: v }));
@@ -1195,7 +1199,6 @@ function startLiveSimulation() {
       App.series.upper.setData(App.state.bands.upper.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
       App.series.middle.setData(App.state.bands.middle.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
       App.series.lower.setData(App.state.bands.lower.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
-      App.series.ma9.setData(App.state.mm9.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
       App.series.rsi.setData(App.state.rsi.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
       App.series.macd.setData(App.state.mom.map((v, i) => v !== null ? {
         time: App.data[i].time,
@@ -1211,7 +1214,7 @@ function startLiveSimulation() {
         App.series.middle.update({ time: newPoint.time, value: App.state.bands.middle[lastIdx] });
         App.series.lower.update({ time: newPoint.time, value: App.state.bands.lower[lastIdx] });
       }
-      if (App.state.mm9[lastIdx] !== null) App.series.ma9.update({ time: newPoint.time, value: App.state.mm9[lastIdx] });
+      if (App.state.vwap[lastIdx] !== null) App.series.vwap.update({ time: newPoint.time, value: App.state.vwap[lastIdx] });
       if (App.state.rsi[lastIdx] !== null) App.series.rsi.update({ time: newPoint.time, value: App.state.rsi[lastIdx] });
       if (App.state.mom[lastIdx] !== null) App.series.macd.update({
         time: newPoint.time,
