@@ -111,11 +111,18 @@ function calculateAllIndicators(values, params = {}) {
     values,
     config: cfg,
     rsi: RSI(values, cfg.rsiPeriod),
+    vwap: VWAP(values, 50),
     bands: bollingerBands(values, cfg.bollingerWindow, cfg.bollingerStd),
     mom: momentum(values, cfg.maFast, cfg.maSlow),
-    mm9: SMA(values, cfg.maFast),
     mm21: SMA(values, cfg.maSlow),
     ema12: EMA(values, 12),
     ema26: EMA(values, 26),
   };
+}
+
+function VWAP(data, period) {
+  return data.map((_, i, arr) => {
+    const slice = arr.slice(Math.max(0, i - period + 1), i + 1);
+    return slice.reduce((a, b) => a + b, 0) / slice.length;
+  });
 }
