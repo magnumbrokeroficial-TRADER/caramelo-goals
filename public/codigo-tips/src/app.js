@@ -224,6 +224,8 @@ function buildCharts() {
 
   // MM rápida
   App.series.ma9 = App.charts.main.addLineSeries({ color: '#facc15', lineWidth: 2, priceLineVisible: false });
+  App.series.ma9.applyOptions({ priceFormat: { type: 'custom', minMove: 1, formatter: price => '' }, lastValueVisible: false, priceLineVisible: false });
+  // MM9 atualizada
   App.series.ma9.setData(App.state.mm9.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
 
   // Linha principal de gols
@@ -233,6 +235,7 @@ function buildCharts() {
     crosshairMarkerVisible: true, crosshairMarkerRadius: 4,
   });
   App.series.goals.setData(App.data);
+  App.series.goals.applyOptions({ priceFormat: { type: 'price', precision: 0, minMove: 1 } });;
 
   // ============================================================
   // 🎯 MARCADORES DE SINAL (versão limpa)
@@ -969,10 +972,12 @@ function startLiveSimulation() {
     if (App.data.length === TOTAL_ROUNDS_24H) {
       // Rebuild leve: atualiza dados de todas as séries de uma vez
       App.series.goals.setData(App.data);
+  App.series.goals.applyOptions({ priceFormat: { type: 'price', precision: 0, minMove: 1 } });;
       App.series.upper.setData(App.state.bands.upper.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
       App.series.middle.setData(App.state.bands.middle.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
       App.series.lower.setData(App.state.bands.lower.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
-      App.series.ma9.setData(App.state.mm9.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
+      // MM9 atualizada
+  App.series.ma9.setData(App.state.mm9.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
       App.series.rsi.setData(App.state.rsi.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
       App.series.macd.setData(App.state.mom.map((v, i) => v !== null ? {
         time: App.data[i].time,
