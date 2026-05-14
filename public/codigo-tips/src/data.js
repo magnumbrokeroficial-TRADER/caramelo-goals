@@ -363,14 +363,67 @@ function generate24hHistory(rule = (s => (s.home + s.away) >= 3), gamesPerHour =
 async function loadMarket(marketKey = 'copa') {
   const fallback = MARKETS_FALLBACK[marketKey] || MARKETS_FALLBACK.copa;
   const now = new Date();
-  const leagues = {
-    copa: "The Americas||Copa do Brasil",
-    euro: "UEFA Competitions||UEFA Champions League",
-    super: "UEFA Competitions||UEFA Europa League",
-    premier: "United Kingdom||England Premier League"
-  };
+  const useRounds = window.TOTAL_ROUNDS_24H || TOTAL_ROUNDS_24H;
 
+  // Tenta Virtual API primeiro (RapidAPI — dados ao vivo)
   try {
+    const res = await fetch('/api/virtual');
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const virtual = await res.json();
+    if (!virtual?.leagues) throw new Error('Resposta inválida');
+
+    // Salva match data global para o painel
+    window.__LAST_MATCH = virtual.leagues;
+
+    // Pega a probabilidade Over 2.5 da liga solicitada
+    const leagueData = virtual.leagues[marketKey];
+    const prob = leagueData?.prob?.over25;
+
+    if (prob !== null && prob !== undefined) {
+      // Gera série sintética de 24h ancorada no valor atual
+      const realValues = [prob];
+      const values = extendBackTo24h(realValues, useRounds);
+      const startTime = new Date(now.getTime() - (values.length - 1) * 240 * 1000);
+
+      const match = leagueData?.match || {};
+      console.log(`[VirtualAPI] ${marketKey}: ${match.timeA||'?'} vs ${match.timeB||'?'} [${match.resultado||'?'}] over25=${prob}%`);
+
+      return {
+        name: fallback.name,
+        icon: fallback.icon,
+        data: buildSeries(values, startTime),
+        power: null,
+        atualizado: new Date().toISOString(),
+        fonte: 'virtual',
+        realCount: 1,
+        match: match,
+        odds: leagueData?.odds || null,
+        leagueStatus: Object.fromEntries(
+          Object.entries(virtual.leagues).map(([k, v]) => [
+            k, v.error ? { error: v.error } : {
+              placar: v.match?.resultado,
+              over25: v.prob?.over25,
+              btts: v.prob?.btts_sim,
+            }
+          ])
+        ),
+      };
+    }
+
+    throw new Error('Sem probabilidade Over 2.5');
+  } catch (err) {
+    console.warn('Virtual API falhou, tentando PulseScore:', err.message);
+  }
+
+  // Fallback: PulseScore API
+  try {
+    const leagues = {
+      copa: "The Americas||Copa do Brasil",
+      euro: "UEFA Competitions||UEFA Champions League",
+      super: "UEFA Competitions||UEFA Europa League",
+      premier: "United Kingdom||England Premier League"
+    };
     const league = leagues[marketKey] || leagues.copa;
     const res = await fetch(`/api/pulse?league=${encodeURIComponent(league)}`);
 
@@ -378,7 +431,6 @@ async function loadMarket(marketKey = 'copa') {
     const events = await res.json();
     if (!Array.isArray(events) || events.length === 0) throw new Error('Nenhum evento');
 
-    // Extrai implied goals do Goal Line Over de cada evento
     const rawValues = [];
     for (const event of events) {
       for (const tab of event.tabs || []) {
@@ -400,7 +452,6 @@ async function loadMarket(marketKey = 'copa') {
 
     if (rawValues.length === 0) throw new Error('Nenhum valor Goal Line extraído');
 
-    // Suaviza com média móvel
     const smoothed = [];
     const windowSize = Math.min(rawValues.length, 20);
     for (let i = 0; i < rawValues.length; i++) {
@@ -409,7 +460,6 @@ async function loadMarket(marketKey = 'copa') {
       smoothed.push(Math.round(avg));
     }
 
-    const useRounds = window.TOTAL_ROUNDS_24H || TOTAL_ROUNDS_24H;
     const values = extendBackTo24h(smoothed, useRounds);
     const startTime = new Date(now.getTime() - (values.length - 1) * 240 * 1000);
 
@@ -419,7 +469,7 @@ async function loadMarket(marketKey = 'copa') {
       data: buildSeries(values, startTime),
       power: null,
       atualizado: new Date().toISOString(),
-      fonte: 'api',
+      fonte: 'pulse',
       realCount: smoothed.length,
     };
   } catch (err) {

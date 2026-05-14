@@ -8,22 +8,42 @@ export default function Dashboard() {
   const [dados, setDados] = useState<any[]>([]);
   const [sinais, setSinais] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [virtualData, setVirtualData] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/signals')
-      .then(r => r.json())
-      .then(data => {
-        // Constrói série temporal a partir dos dados de odds
-        const startTime = Math.floor(Date.now() / 1000) - data.serie_over25.length * 240;
-        const chartData = data.serie_over25.map((v: number, i: number) => ({
+    async function load() {
+      try {
+        // Carrega dados do sinal e virtual API em paralelo
+        const [signalsRes, virtualRes] = await Promise.all([
+          fetch('/api/signals'),
+          fetch('/api/virtual'),
+        ]);
+
+        const signalsData = await signalsRes.json();
+        const virtualData = virtualRes.ok ? await virtualRes.json() : null;
+
+        // Constrói série temporal
+        const startTime = Math.floor(Date.now() / 1000) - (signalsData.serie_over25?.length || 76) * 240;
+        const chartData = (signalsData.serie_over25 || []).map((v: number, i: number) => ({
           time: startTime + i * 240,
           value: v,
         }));
+
         setDados(chartData);
+        setVirtualData(virtualData);
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      } catch {
+        setLoading(false);
+      }
+    }
+    load();
+
+    // Polling a cada 30s
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  const leagues = virtualData?.leagues || {};
 
   return (
     <div className="flex flex-col h-screen bg-[#0a0a0a] text-gray-200">
@@ -31,7 +51,11 @@ export default function Dashboard() {
         <span className="text-lg font-bold text-amber-400">⚽ caramelo.goals</span>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500">🏆 Copa</span>
-          <span className="text-xs text-green-400">● SCANNER ATIVO</span>
+          {virtualData ? (
+            <span className="text-xs text-green-400">● BET365 VIRTUAL</span>
+          ) : (
+            <span className="text-xs text-green-400">● SCANNER ATIVO</span>
+          )}
         </div>
       </header>
 
@@ -45,9 +69,33 @@ export default function Dashboard() {
 
         <main className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="flex-1 flex items-center justify-center text-gray-500">⏳ Carregando dados reais do DarkOdds...</div>
+            <div className="flex-1 flex items-center justify-center text-gray-500">⏳ Carregando dados...</div>
           ) : (
             <>
+              {/* Match Info Panel */}
+              {virtualData && (
+                <div className="grid grid-cols-3 gap-2 p-3 bg-[#141414] border-b border-[#1f1f1f] text-xs">
+                  {Object.entries(leagues).map(([key, data]: [string, any]) => {
+                    const m = data?.match;
+                    const p = data?.prob;
+                    if (!m) return null;
+                    return (
+                      <div key={key} className="bg-[#0a0a0a] rounded p-2 border border-[#1f1f1f]">
+                        <div className="text-gray-500 mb-1">
+                          {key === 'copa' ? '🏆' : key === 'euro' ? '🌍' : '🏴'} {key.toUpperCase()}
+                        </div>
+                        <div className="text-white font-medium">{m.timeA} vs {m.timeB}</div>
+                        <div className="text-lg font-bold text-amber-400">{m.resultado}</div>
+                        <div className="flex gap-2 mt-1">
+                          <span className="text-gray-400">{m.minuto}'</span>
+                          <span className="text-green-400">O2.5: {p?.over25 || '?'}%</span>
+                          <span className="text-yellow-400">BTTS: {p?.btts_sim || '?'}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div className="p-4">
                 <MainChart
                   dados={dados}
@@ -58,7 +106,10 @@ export default function Dashboard() {
                   sinais={sinais}
                 />
               </div>
-              <MosaicTiles tiles={[]} />
+              <MosaicTiles
+                tiles={[]}
+                virtualData={virtualData}
+              />
             </>
           )}
         </main>
@@ -66,8 +117,8 @@ export default function Dashboard() {
 
       <footer className="bg-[#141414] border-t border-[#1f1f1f] px-4 py-2 flex items-center gap-4 text-xs text-gray-500">
         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-        <span>SCANNER · 10 padrões ativos</span>
-        <span className="ml-auto">DarkOdds v2.0 · Dados reais Bet365</span>
+        <span>SCANNER · Bet365 Virtual</span>
+        <span className="ml-auto">DarkOdds v2.0 · Dados ao vivo</span>
       </footer>
     </div>
   );

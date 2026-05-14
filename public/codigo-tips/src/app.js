@@ -123,8 +123,10 @@ async function loadAndRender(marketKey) {
   App.btResults = backtestSignals(App.signals, values, cfg.backtestHorizon);
 
   // Atualiza header com fonte de dados
-  const sourceTag = market.fonte === 'api'
-    ? `🟢 PulseScore · ${market.realCount}pts reais`
+  const sourceTag = market.fonte === 'virtual'
+    ? `🟢 Bet365 Virtual · ${market.match?.timeA||'?'} vs ${market.match?.timeB||'?'} [${market.match?.resultado||'?'}]`
+    : market.fonte === 'pulse'
+    ? `🔵 PulseScore · ${market.realCount}pts reais`
     : `🟡 Mock (API offline)`;
   const updatedTag = market.atualizado
     ? ` · atualizado ${BR.hm(new Date(market.atualizado))}`
