@@ -982,6 +982,9 @@ main {
 .stat-chip-value { font-weight: 700; }
 
 .mosaic-grid.mosaic-grid-20x20 {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: visible;
   max-height: none;
@@ -1157,6 +1160,14 @@ footer { background: var(--bg-panel); border-top: 1px solid var(--border); displ
   position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85);
   display: none; align-items: center; justify-content: center; z-index: 1000;
   backdrop-filter: blur(8px);
+}
+
+/* ===== FIX MOSAICO LARGURA 100% ===== */
+.mosaic-section {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: auto !important;
 }
 .modal-overlay.active { display: flex; }
 

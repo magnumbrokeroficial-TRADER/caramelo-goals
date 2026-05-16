@@ -160,10 +160,11 @@ function renderAllPanels() {
 }
 
 function renderMosaicGrid() {
-  // MOSAICO 20×20 — sempre usa os 400 jogos mais recentes
+  // MOSAICO 20×20 — sempre usa os 400 jogos mais recentes da API real
   const allMatches = App.recent_matches || [];
 
   if (!allMatches.length) {
+    console.warn('[MOSAICO] Nenhum recent_match disponível — API pode estar offline');
     const container = document.getElementById('mosaicGridLive');
     if (container) container.innerHTML = '<div class="mosaic-empty">DarkOdds sem partidas disponíveis</div>';
     const statsEl = document.getElementById('mosaicStatsLive');
@@ -171,6 +172,7 @@ function renderMosaicGrid() {
     return;
   }
 
+  console.log(`[MOSAICO] Carregados ${allMatches.length} jogos da API real (/api/virtual)`);
   renderMosaicLive(allMatches, App.currentRule || 'over25', {});
 }
 

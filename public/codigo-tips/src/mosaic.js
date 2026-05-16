@@ -45,6 +45,7 @@ function renderMosaicLive(matches, rule = 'over25', options = {}) {
   const ruleObj = MOSAIC_RULES[rule] || MOSAIC_RULES.over25;
   const total = MOSAIC_COLS * MOSAIC_ROWS; // 400
   const jogos = matches.slice(0, total);
+  console.log(`[MOSAICO] Renderizando grid ${MOSAIC_COLS}×${MOSAIC_ROWS} = ${jogos.length} jogos (${matches.length} disponíveis)`);
 
   // Dividir em 20 colunas de 20 jogos cada
   const colunas = [];
