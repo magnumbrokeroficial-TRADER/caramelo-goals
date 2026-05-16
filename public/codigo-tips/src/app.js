@@ -1093,7 +1093,7 @@ function refreshMarkers() {
         toShow.push({
           time: App.data[idx].time,
           position: 'aboveBar',
-          color: 'rgba(255,255,255,0.3)',
+          color: 'rgba(255,255,255,0.10)',
           shape: 'square',
           size: 0,
           text: d.historico_horas[i].fase.substring(0, 4).toUpperCase(),
@@ -1221,10 +1221,10 @@ function addCycleZoneBands(chart, data) {
   const maxVal = Math.max(...data.map(d => d.value), 80);
 
   const zones = [
-    { base: 42, value: 0,  color: 'rgba(59,139,212,0.08)'   }, // compressão: 0–42
-    { base: 52, value: 42, color: 'rgba(239,159,39,0.06)'   }, // aceleração: 42–52
-    { base: 58, value: 52, color: 'rgba(226,75,74,0.08)'    }, // explosão: 52–58
-    { base: 58, value: maxVal, color: 'rgba(163,45,45,0.12)'}, // explosão forte: 58+
+    { base: 42, value: 0,  color: 'rgba(59,139,212,0.10)'   }, // compressão: 0–42
+    { base: 52, value: 42, color: 'rgba(239,159,39,0.10)'   }, // aceleração: 42–52
+    { base: 58, value: 52, color: 'rgba(226,75,74,0.10)'    }, // explosão: 52–58
+    { base: 58, value: maxVal, color: 'rgba(163,45,45,0.10)'}, // explosão forte: 58+
   ];
 
   zones.forEach(z => {
@@ -1251,15 +1251,15 @@ function addCycleZoneBands(chart, data) {
 function addCycleThresholds(goalsSeries) {
   if (!goalsSeries) return;
   goalsSeries.createPriceLine({
-    price: 42, color: 'rgba(59,139,212,0.5)', lineWidth: 1, lineStyle: 2,
+    price: 42, color: 'rgba(59,139,212,0.10)', lineWidth: 1, lineStyle: 2,
     axisLabelVisible: true, title: 'Compressão',
   });
   goalsSeries.createPriceLine({
-    price: 48, color: 'rgba(136,135,128,0.35)', lineWidth: 1, lineStyle: 1,
+    price: 48, color: 'rgba(136,135,128,0.10)', lineWidth: 1, lineStyle: 1,
     axisLabelVisible: true, title: 'Média',
   });
   goalsSeries.createPriceLine({
-    price: 58, color: 'rgba(226,75,74,0.5)', lineWidth: 1, lineStyle: 2,
+    price: 58, color: 'rgba(226,75,74,0.10)', lineWidth: 1, lineStyle: 2,
     axisLabelVisible: true, title: 'Explosão',
   });
 }
@@ -1290,7 +1290,7 @@ function updateTransitionLines() {
     if (!transTime) continue;
 
     const vLine = App.charts.main.addLineSeries({
-      color: 'rgba(255,255,255,0.12)',
+      color: 'rgba(255,255,255,0.10)',
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
