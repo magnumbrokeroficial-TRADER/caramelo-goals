@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const DARKODDS_URL = process.env.DARKODDS_URL || 'https://rambling-crafty-riveting.ngrok-free.dev';
 
@@ -8,8 +8,8 @@ const LIGA_ICON: Record<string, string> = {
   copa: '🏆', euro: '🌍', super: '💥', premier: '🏴',
 };
 
-async function fetchLive(liga: string) {
-  const resp = await fetch(`${DARKODDS_URL}/api/live?liga=${encodeURIComponent(liga)}`, {
+async function fetchLive(liga: string, limit: number) {
+  const resp = await fetch(`${DARKODDS_URL}/api/live?liga=${encodeURIComponent(liga)}&limit=${limit}`, {
     headers: { 'ngrok-skip-browser-warning': 'true' },
     signal: AbortSignal.timeout(8000),
   });
@@ -72,10 +72,12 @@ function extractProb(odds: Record<string, string | null>): Record<string, number
   return prob;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const limitParam = request.nextUrl.searchParams.get('limit');
+  const limit = Math.min(Math.max(parseInt(limitParam || '360'), 10), 500);
   const tasks = LIGAS.map(async (liga) => {
     try {
-      const [liveData, oddsData] = await Promise.all([fetchLive(liga), fetchOdds(liga)]);
+      const [liveData, oddsData] = await Promise.all([fetchLive(liga, limit), fetchOdds(liga)]);
 
       const jogos = oddsData?.jogos || [];
       const primeiroJogo = jogos[0];
@@ -83,7 +85,7 @@ export async function GET() {
       const timeB = primeiroJogo?.home?.split(' x ')[1]?.trim() || primeiroJogo?.away?.trim() || '—';
       const odds = extractOdds(primeiroJogo);
 
-      const recent_matches = jogos.slice(0, 80).map((j: any) => {
+      const recent_matches = jogos.slice(0, limit).map((j: any) => {
         const home = j.home?.split(' x ')[0]?.trim() || '—';
         const away = j.home?.split(' x ')[1]?.trim() || j.away?.trim() || '—';
         const jOdds = extractOdds(j);
@@ -117,12 +119,12 @@ export async function GET() {
           odds,
           prob: extractProb(odds),
           series: {
-            total_goals: series.total_goals?.slice(0, 80) || [],
-            over25: series.over25?.slice(0, 80) || [],
-            over15: series.over15?.slice(0, 80) || [],
-            over35: series.over35?.slice(0, 80) || [],
-            btts_yes: series.btts_yes?.slice(0, 80) || [],
-            timestamps: series.timestamps?.slice(0, 80) || [],
+            total_goals: series.total_goals?.slice(0, limit) || [],
+            over25: series.over25?.slice(0, limit) || [],
+            over15: series.over15?.slice(0, limit) || [],
+            over35: series.over35?.slice(0, limit) || [],
+            btts_yes: series.btts_yes?.slice(0, limit) || [],
+            timestamps: series.timestamps?.slice(0, limit) || [],
           },
           total_jogos: liveData?.total_jogos || 0,
           power: liveData?.power || null,

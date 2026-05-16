@@ -40,8 +40,8 @@ function renderMosaicLive(matches, rule = 'over25', options = {}) {
   container.innerHTML = '';
   container.className = `mosaic-grid ${showOdds ? 'with-odds' : ''}`;
 
-  // Mostra até 80 partidas em grid auto-fill
-  const maxTiles = Math.min(matches.length, 80);
+  // Mostra as partidas recebidas (quantidade controlada pelo caller em app.js)
+  const maxTiles = matches.length;
   let totalCells = 0, wins = 0;
 
   for (let i = 0; i < maxTiles; i++) {

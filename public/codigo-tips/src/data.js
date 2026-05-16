@@ -133,9 +133,13 @@ async function loadMarket(marketKey = 'copa') {
   const fallback = MARKETS[marketKey] || MARKETS.copa;
   const now = new Date();
 
+  // Lê o dropdown Qtd. Jogos para definir o limite da requisição
+  const limitEl = document.getElementById('qtdJogosSelect');
+  const limit = limitEl ? parseInt(limitEl.value) : 360;
+
   // Tenta Virtual API (DarkOdds via Next.js proxy)
   try {
-    const res = await fetch('/api/virtual');
+    const res = await fetch('/api/virtual?limit=' + limit);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const virtual = await res.json();
     if (!virtual?.leagues) throw new Error('Resposta inválida');

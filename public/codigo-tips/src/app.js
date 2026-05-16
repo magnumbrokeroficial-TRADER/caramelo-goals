@@ -154,15 +154,21 @@ function renderAllPanels() {
 function renderMosaicGrid() {
   // MOSAICO REAL — re-renderiza os recent_matches já carregados
   // Se não houver dados, mostra mensagem de vazio
-  const matches = App.recent_matches || [];
+  const allMatches = App.recent_matches || [];
 
-  if (!matches.length) {
+  if (!allMatches.length) {
     const container = document.getElementById('mosaicGridLive');
     if (container) container.innerHTML = '<div class="mosaic-empty">DarkOdds sem partidas disponíveis</div>';
     const statsEl = document.getElementById('mosaicStatsLive');
     if (statsEl) statsEl.innerHTML = '';
     return;
   }
+
+  // Filtra pela janela de horas selecionada (afeta quantos tiles mostrar)
+  const hours = App.mosaicHours || 24;
+  const hoursMap = { 3: 10, 6: 20, 8: 30, 12: 40, 18: 60, 24: 80 };
+  const maxByHours = hoursMap[hours] || 80;
+  const matches = allMatches.slice(0, maxByHours);
 
   renderMosaicLive(matches, App.currentRule || 'over25', {});
 }
