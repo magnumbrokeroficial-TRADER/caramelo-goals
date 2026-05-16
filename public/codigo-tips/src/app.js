@@ -73,7 +73,11 @@ async function loadAndRender(marketKey) {
   fetchHistory();
 
   // Analista de ciclo — não bloqueia o gráfico
-  fetchAnalyst(marketKey).then(data => renderAnalyst(data, 'analystWidget'));
+  fetchAnalyst(marketKey).then(data => {
+    renderAnalyst(data, 'analystWidget');
+    App.analystData = data;
+    if (App.charts.main) updateCycleChart();
+  });
 
   const values = App.data.map(d => d.value);
   App.state = calculateAllIndicators(values, cfg);
@@ -141,6 +145,7 @@ async function loadAndRender(marketKey) {
   document.getElementById('scanLabel').textContent = `SCANNER · ${DETECTORS.length} padrões`;
 
   buildCharts();
+  if (App.analystData && App.charts.main) updateCycleChart();
   renderAllPanels();
   renderMosaicGrid();
 }
@@ -217,6 +222,9 @@ function buildCharts() {
   App.charts.main = LightweightCharts.createChart(mainEl, {
     ...chartCommon, width: mainEl.clientWidth, height: mainEl.clientHeight,
   });
+  App.series.cycleZoneBands = [];
+  App.series.transitionLines = [];
+  addCycleZoneBands(App.charts.main, App.data);
   App.charts.rsi = LightweightCharts.createChart(rsiEl, {
     ...chartCommon, width: rsiEl.clientWidth, height: rsiEl.clientHeight,
   });
@@ -251,7 +259,8 @@ function buildCharts() {
     crosshairMarkerVisible: true, crosshairMarkerRadius: 4,
   });
   App.series.goals.setData(App.data);
-  App.series.goals.applyOptions({ priceFormat: { type: 'price', precision: 0, minMove: 1 } });;
+  App.series.goals.applyOptions({ priceFormat: { type: 'price', precision: 0, minMove: 1 } });
+  addCycleThresholds(App.series.goals);
 
   // ============================================================
   // 🎯 MARCADORES DE SINAL (versão limpa)
@@ -1063,6 +1072,36 @@ function refreshMarkers() {
     });
   }
 
+  // 🎯 Ciclo: fase atual + transições (sempre visíveis)
+  if (App.analystData && App.data && App.data.length > 0) {
+    const d = App.analystData;
+    const faseCor = { compressao:'#3B8BD4', aceleracao:'#EF9F27', explosao:'#E24B4A', explosao_forte:'#A32D2D' }[d.fase_atual] || '#888';
+    const lastIdx = App.data.length - 1;
+    toShow.push({
+      time: App.data[lastIdx].time,
+      position: 'belowBar',
+      color: faseCor,
+      shape: 'arrowUp',
+      size: 0,
+      text: `● ${(d.fase_atual||'').replace(/_/g,' ').toUpperCase()}  SINAL: ${(d.sinal||'').toUpperCase()} ${Math.round((d.confianca||0)*100)}%`,
+    });
+    if (d.historico_horas && d.historico_horas.length > 1) {
+      for (let i = 1; i < d.historico_horas.length; i++) {
+        if (d.historico_horas[i].fase === d.historico_horas[i-1].fase) continue;
+        const ratio = i / d.historico_horas.length;
+        const idx = Math.min(Math.floor(ratio * App.data.length), App.data.length - 1);
+        toShow.push({
+          time: App.data[idx].time,
+          position: 'aboveBar',
+          color: 'rgba(255,255,255,0.3)',
+          shape: 'square',
+          size: 0,
+          text: d.historico_horas[i].fase.substring(0, 4).toUpperCase(),
+        });
+      }
+    }
+  }
+
   toShow.sort((a, b) => a.time - b.time);
   App.series.goals.setMarkers(toShow);
 }
@@ -1171,4 +1210,99 @@ const UserFeedback = {
     return byPattern;
   },
 };
+// ============================================================
+// 🎯 DETECTORES DE CICLO NO GRÁFICO (Lightweight Charts)
+// ============================================================
+// Bandas de fundo (area series com baseValue)
+function addCycleZoneBands(chart, data) {
+  if (!data || data.length < 2) return;
+  const t0 = data[0].time;
+  const t1 = data[data.length - 1].time;
+  const maxVal = Math.max(...data.map(d => d.value), 80);
+
+  const zones = [
+    { base: 42, value: 0,  color: 'rgba(59,139,212,0.08)'   }, // compressão: 0–42
+    { base: 52, value: 42, color: 'rgba(239,159,39,0.06)'   }, // aceleração: 42–52
+    { base: 58, value: 52, color: 'rgba(226,75,74,0.08)'    }, // explosão: 52–58
+    { base: 58, value: maxVal, color: 'rgba(163,45,45,0.12)'}, // explosão forte: 58+
+  ];
+
+  zones.forEach(z => {
+    try {
+      const s = chart.addAreaSeries({
+        baseValue: { type: 'price', price: z.base },
+        topColor: z.color,
+        bottomColor: z.color,
+        lineColor: 'rgba(0,0,0,0)',
+        lineWidth: 0,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      });
+      s.setData([{ time: t0, value: z.value }, { time: t1, value: z.value }]);
+      App.series.cycleZoneBands.push(s);
+    } catch (e) {
+      console.warn('[Cycle] Zone band error:', e.message);
+    }
+  });
+}
+
+// Linhas de threshold (price lines no eixo Y)
+function addCycleThresholds(goalsSeries) {
+  if (!goalsSeries) return;
+  goalsSeries.createPriceLine({
+    price: 42, color: 'rgba(59,139,212,0.5)', lineWidth: 1, lineStyle: 2,
+    axisLabelVisible: true, title: 'Compressão',
+  });
+  goalsSeries.createPriceLine({
+    price: 48, color: 'rgba(136,135,128,0.35)', lineWidth: 1, lineStyle: 1,
+    axisLabelVisible: true, title: 'Média',
+  });
+  goalsSeries.createPriceLine({
+    price: 58, color: 'rgba(226,75,74,0.5)', lineWidth: 1, lineStyle: 2,
+    axisLabelVisible: true, title: 'Explosão',
+  });
+}
+
+// Atualiza overlays do ciclo (chamado quando analystData chega)
+function updateCycleChart() {
+  refreshMarkers();
+  updateTransitionLines();
+}
+
+// Linhas verticais nas transições de fase
+function updateTransitionLines() {
+  (App.series.transitionLines || []).forEach(s => {
+    try { App.charts.main?.removeSeries(s); } catch (e) {}
+  });
+  App.series.transitionLines = [];
+
+  const hist = App.analystData?.historico_horas;
+  if (!hist || hist.length < 2 || !App.data || !App.charts.main) return;
+
+  const maxVal = Math.max(...App.data.map(d => d.value), 80);
+
+  for (let i = 1; i < hist.length; i++) {
+    if (hist[i].fase === hist[i - 1].fase) continue;
+    const ratio = i / hist.length;
+    const idx = Math.min(Math.floor(ratio * App.data.length), App.data.length - 1);
+    const transTime = App.data[idx]?.time;
+    if (!transTime) continue;
+
+    const vLine = App.charts.main.addLineSeries({
+      color: 'rgba(255,255,255,0.12)',
+      lineWidth: 1,
+      lineStyle: 2,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    // Dois pontos no mesmo timestamp = linha vertical no gráfico
+    vLine.setData([
+      { time: transTime, value: 0 },
+      { time: transTime, value: maxVal },
+    ]);
+    App.series.transitionLines.push(vLine);
+  }
+}
 // deploy 1778562734
