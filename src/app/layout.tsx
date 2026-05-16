@@ -27,7 +27,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <script dangerouslySetInnerHTML={{__html:`window.__DARKODDS_URL__=''`}} />
+      <script dangerouslySetInnerHTML={{__html:`window.__DARKODDS_URL__='${process.env.NEXT_PUBLIC_DARKODDS_URL || ''}'`}} />
 <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

@@ -1,10 +1,12 @@
 /* ============================================================
-   🧩 MOSAIC RENDERER — Partidas reais da DarkOdds
+   🧩 MOSAIC RENDERER — Grid 20×20
    ============================================================
-   Renderiza o mosaico no rodapé usando dados REAIS de
-   recent_matches do /api/virtual. NUNCA gera placares
-   sintéticos. Multi-row grid com até 80 partidas.
+   Renderiza EXATAMENTE 20 colunas × 20 jogos por coluna.
+   Total: 400 cards. Condição irrevogável.
 ============================================================ */
+
+const MOSAIC_COLS = 20;
+const MOSAIC_ROWS = 20;
 
 const MOSAIC_RULES = {
   'over25':   { test: s => parseFloat(s.over25_odd) >= 2.0, label: 'Over 2.5' },
@@ -16,10 +18,17 @@ const MOSAIC_RULES = {
   'zerozero': { test: s => false, label: 'Placar 0x0' },
 };
 
+function parseScore(score) {
+  if (!score || score === '—' || score === '0-0') return null;
+  const parts = score.split('-');
+  if (parts.length !== 2) return null;
+  return { home: parseInt(parts[0]) || 0, away: parseInt(parts[1]) || 0 };
+}
+
 /* ============================================================
-   RENDERIZADOR PRINCIPAL
+   RENDERIZADOR PRINCIPAL — Grid 20×20 fixo
    Recebe: array de matches [{ timeA, timeB, score, over25_odd, minuto }]
-   Renderiza grid multi-coluna com até 80 tiles.
+   Renderiza grid 20 colunas × 20 jogos. NUNCA mais nem menos.
 ============================================================ */
 
 function renderMosaicLive(matches, rule = 'over25', options = {}) {
@@ -34,58 +43,81 @@ function renderMosaicLive(matches, rule = 'over25', options = {}) {
   }
 
   const ruleObj = MOSAIC_RULES[rule] || MOSAIC_RULES.over25;
-  const showOdds = options.showOdds !== undefined ? options.showOdds :
-    (document.getElementById('tgShowOdds')?.checked || false);
+  const total = MOSAIC_COLS * MOSAIC_ROWS; // 400
+  const jogos = matches.slice(0, total);
 
-  container.innerHTML = '';
-  container.className = `mosaic-grid ${showOdds ? 'with-odds' : ''}`;
+  // Dividir em 20 colunas de 20 jogos cada
+  const colunas = [];
+  for (let c = 0; c < MOSAIC_COLS; c++) {
+    const inicio = c * MOSAIC_ROWS;
+    const fim = inicio + MOSAIC_ROWS;
+    colunas.push(jogos.slice(inicio, fim));
+  }
 
-  // Mostra as partidas recebidas (quantidade controlada pelo caller em app.js)
-  const maxTiles = matches.length;
+  // Estatísticas
   let totalCells = 0, wins = 0;
 
-  for (let i = 0; i < maxTiles; i++) {
-    const match = matches[i];
+  container.innerHTML = '';
+  container.className = 'mosaic-grid mosaic-grid-20x20';
 
-    const hasScore = match.score && match.score !== '—' && match.score !== '0-0';
-    const won = hasScore ? ruleObj.test(match) : false;
-    if (hasScore) {
-      totalCells++;
-      if (won) wins++;
+  const grid = document.createElement('div');
+  grid.className = 'mosaic-grid-inner';
+
+  colunas.forEach((coluna, ci) => {
+    const col = document.createElement('div');
+    col.className = 'mosaic-column';
+
+    coluna.forEach(jogo => {
+      const scoreObj = parseScore(jogo.score);
+      const gols = scoreObj ? scoreObj.home + scoreObj.away : 0;
+      const hasScore = scoreObj !== null;
+      const isOver = gols >= 3;
+      const isNext = !hasScore;
+
+      if (hasScore) {
+        totalCells++;
+        if (isOver) wins++;
+      }
+
+      const card = document.createElement('div');
+      card.className = `mosaic-cell ${isNext ? 'proximo' : isOver ? 'win' : 'loss'}`;
+
+      const placar = isNext
+        ? `<span class="cell-label-next">⏳ próximo</span>`
+        : `<span class="cell-score${isOver ? ' cell-score-over' : ''}">${jogo.score}</span>`;
+
+      card.innerHTML = `
+        ${placar}
+        <span class="cell-teams">${(jogo.timeA || '—').slice(0, 6)} vs ${(jogo.timeB || '—').slice(0, 6)}</span>
+      `;
+
+      card.title = hasScore
+        ? `${jogo.timeA || '?'} vs ${jogo.timeB || '?'} · ${jogo.score} · ${gols} gols · ${ruleObj.label}: ${isOver ? '✓' : '✗'}`
+        : `${jogo.timeA || '?'} vs ${jogo.timeB || '?'} · Jogo na rotação, sem placar ainda`;
+
+      col.appendChild(card);
+    });
+
+    // Preencher colunas incompletas com placeholders
+    while (col.children.length < MOSAIC_ROWS) {
+      const empty = document.createElement('div');
+      empty.className = 'mosaic-cell mosaic-cell-empty';
+      col.appendChild(empty);
     }
 
-    const cell = document.createElement('div');
-    cell.className = `mosaic-cell`;
-    if (hasScore) {
-      cell.classList.add(won ? 'win' : 'loss');
-    } else {
-      cell.classList.add('proximo');
-    }
+    grid.appendChild(col);
+  });
 
-    const score = hasScore ? match.score : '⏳ próximo';
-    const oddStr = match.over25_odd ? `O2.5: ${match.over25_odd.toFixed(2)}` : '';
-
-    let content = `<div class="cell-score">${score}</div>`;
-    content += `<div class="cell-teams">${(match.timeA || '—').slice(0, 8)}<br>${(match.timeB || '—').slice(0, 8)}</div>`;
-    if (showOdds && oddStr) {
-      content += `<div class="cell-odds">${oddStr}</div>`;
-    }
-
-    cell.innerHTML = content;
-    cell.title = hasScore
-      ? `${match.timeA || '?'} vs ${match.timeB || '?'} · Placar: ${score} · Odd O2.5: ${match.over25_odd || '—'} · ${ruleObj.label}: ${won ? '✓' : '✗'}`
-      : `${match.timeA || '?'} vs ${match.timeB || '?'} · Jogo na rotação, sem placar ainda`;
-    container.appendChild(cell);
-  }
+  container.appendChild(grid);
 
   // Stats
   const winPct = totalCells > 0 ? (wins / totalCells * 100).toFixed(1) : 0;
   if (statsEl) {
     statsEl.innerHTML = `
-      <div class="stat-chip"><span class="stat-chip-label">✓</span><span class="stat-chip-value" style="color:var(--green)">${winPct}%</span></div>
-      <div class="stat-chip"><span class="stat-chip-label">✗</span><span class="stat-chip-value" style="color:var(--red)">${(100 - parseFloat(winPct)).toFixed(1)}%</span></div>
+      <div class="stat-chip"><span class="stat-chip-label">✓ Over 3+</span><span class="stat-chip-value" style="color:var(--green)">${winPct}%</span></div>
+      <div class="stat-chip"><span class="stat-chip-label">✗ Under</span><span class="stat-chip-value" style="color:var(--red)">${(100 - parseFloat(winPct)).toFixed(1)}%</span></div>
       <div class="stat-chip"><span class="stat-chip-label">Jogos:</span><span class="stat-chip-value">${totalCells}</span></div>
-      <div class="stat-chip"><span class="stat-chip-label">Fonte:</span><span class="stat-chip-value">DarkOdds</span></div>
+      <div class="stat-chip"><span class="stat-chip-label">Grid:</span><span class="stat-chip-value">${MOSAIC_COLS}×${MOSAIC_ROWS}</span></div>
     `;
   }
 }

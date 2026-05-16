@@ -160,8 +160,7 @@ function renderAllPanels() {
 }
 
 function renderMosaicGrid() {
-  // MOSAICO REAL — re-renderiza os recent_matches já carregados
-  // Se não houver dados, mostra mensagem de vazio
+  // MOSAICO 20×20 — sempre usa os 400 jogos mais recentes
   const allMatches = App.recent_matches || [];
 
   if (!allMatches.length) {
@@ -172,13 +171,7 @@ function renderMosaicGrid() {
     return;
   }
 
-  // Filtra pela janela de horas selecionada (afeta quantos tiles mostrar)
-  const hours = App.mosaicHours || 24;
-  const hoursMap = { 3: 60, 6: 120, 8: 160, 12: 240, 18: 360, 24: 480 };
-  const maxByHours = hoursMap[hours] || 480;
-  const matches = allMatches.slice(0, maxByHours);
-
-  renderMosaicLive(matches, App.currentRule || 'over25', {});
+  renderMosaicLive(allMatches, App.currentRule || 'over25', {});
 }
 
 // ====== GRÁFICOS ======
