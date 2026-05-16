@@ -72,6 +72,9 @@ async function loadAndRender(marketKey) {
   // Busca histórico em paralelo (não bloqueia)
   fetchHistory();
 
+  // Analista de ciclo — não bloqueia o gráfico
+  fetchAnalyst(marketKey).then(data => renderAnalyst(data, 'analystWidget'));
+
   const values = App.data.map(d => d.value);
   App.state = calculateAllIndicators(values, cfg);
 
