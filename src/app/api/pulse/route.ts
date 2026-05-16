@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PULSE_API = 'https://api.pulsescore.net/api/v2/bet365';
-const SECRET = '1e1d3860-2788-4599-9c3a-280fc3c53d6f';
+const DARKODDS_URL = process.env.DARKODDS_URL || 'https://rambling-crafty-riveting.ngrok-free.dev';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const league = searchParams.get('league');
-
-  if (!league) {
-    return NextResponse.json({ error: 'league query param required' }, { status: 400 });
-  }
+  const league = searchParams.get('league') || 'copa';
 
   try {
-    const url = `${PULSE_API}/events?league=${encodeURIComponent(league)}`;
-    const res = await fetch(url, {
-      headers: { 'x-secret': SECRET },
-      next: { revalidate: 60 },
+    const resp = await fetch(`${DARKODDS_URL}/api/live?liga=${encodeURIComponent(league)}`, {
+      headers: { 'ngrok-skip-browser-warning': 'true' },
+      signal: AbortSignal.timeout(8000),
     });
+    if (!resp.ok) throw new Error(`DarkOdds HTTP ${resp.status}`);
+    const data = await resp.json();
 
-    if (!res.ok) {
-      return NextResponse.json({ error: 'PulseScore API error', status: res.status }, { status: res.status });
-    }
-
-    const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json({
+      fonte: 'DarkOdds (Bet365 Virtual)',
+      liga: league,
+      series: data.series || {},
+      power: data.power || {},
+      total_jogos: data.total_jogos || 0,
+      atualizado_em: new Date().toISOString(),
+    });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

@@ -1,96 +1,155 @@
 import { NextResponse } from 'next/server';
 
-const RAPID_HOST = 'futebol-virtual-bet3651.p.rapidapi.com';
-const RAPID_KEY = '08a533a83emsh63450317f16cb3bp1f5d2djsncd64d5d6614d';
+const DARKODDS_URL = process.env.DARKODDS_URL || 'https://rambling-crafty-riveting.ngrok-free.dev';
 
-const LEAGUES = ['copa', 'euro', 'premier'] as const;
+const LIGAS = ['copa', 'euro', 'super', 'premier'];
 
-async function fetchLeague(league: string) {
-  const url = `https://${RAPID_HOST}/matchs`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'x-rapidapi-key': RAPID_KEY,
-      'x-rapidapi-host': RAPID_HOST,
-    },
-    body: new URLSearchParams({ league, home: 'bet365', sport_id: '1' }),
-    signal: AbortSignal.timeout(10000),
+const LIGA_ICON: Record<string, string> = {
+  copa: '🏆', euro: '🌍', super: '💥', premier: '🏴',
+};
+
+async function fetchLive(liga: string) {
+  const resp = await fetch(`${DARKODDS_URL}/api/live?liga=${encodeURIComponent(liga)}`, {
+    headers: { 'ngrok-skip-browser-warning': 'true' },
+    signal: AbortSignal.timeout(8000),
   });
-
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (!data?.matchs?.length) throw new Error('Nenhum match');
-  return data.matchs[0];
+  if (!resp.ok) throw new Error(`live HTTP ${resp.status}`);
+  return resp.json();
 }
 
-function calcProb(decimalOdd: string | undefined): number | null {
-  if (!decimalOdd) return null;
-  const odd = parseFloat(decimalOdd);
-  if (isNaN(odd) || odd <= 0) return null;
-  return Math.round((1 / odd) * 100);
+async function fetchOdds(liga: string) {
+  const resp = await fetch(`${DARKODDS_URL}/api/odds?liga=${encodeURIComponent(liga)}`, {
+    headers: { 'ngrok-skip-browser-warning': 'true' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!resp.ok) throw new Error(`odds HTTP ${resp.status}`);
+  return resp.json();
+}
+
+function extractOdds(jogo: any) {
+  const odds: Record<string, string | null> = {
+    over25: null, under25: null,
+    over15: null, under15: null,
+    over35: null, under35: null,
+    btts_sim: null, btts_nao: null,
+  };
+
+  if (!jogo?.bookmakers?.[0]?.markets) return odds;
+
+  for (const market of jogo.bookmakers[0].markets) {
+    const outcomes = market.outcomes || [];
+    if (market.key === 'totals') {
+      for (const o of outcomes) {
+        const name = o.name || '';
+        const price = o.price?.toString() || null;
+        if (name === 'Over 2.5') odds.over25 = price;
+        else if (name === 'Under 2.5') odds.under25 = price;
+        else if (name === 'Over 1.5') odds.over15 = price;
+        else if (name === 'Under 1.5') odds.under15 = price;
+        else if (name === 'Over 3.5') odds.over35 = price;
+        else if (name === 'Under 3.5') odds.under35 = price;
+        else if (name === 'Over' && !odds.over15) odds.over15 = price;
+        else if (name === 'Under' && !odds.under15) odds.under15 = price;
+      }
+    } else if (market.key === 'btts') {
+      for (const o of outcomes) {
+        const name = o.name || '';
+        const price = o.price?.toString() || null;
+        if (name === 'Yes') odds.btts_sim = price;
+        else if (name === 'No') odds.btts_nao = price;
+      }
+    }
+  }
+
+  return odds;
+}
+
+function extractProb(odds: Record<string, string | null>): Record<string, number | null> {
+  const prob: Record<string, number | null> = {};
+  for (const [key, val] of Object.entries(odds)) {
+    prob[key] = val ? Math.round((1 / parseFloat(val)) * 100) : null;
+  }
+  return prob;
 }
 
 export async function GET() {
-  const results: Record<string, any> = {};
-  const over25Values: number[] = [];
-
-  for (const league of LEAGUES) {
+  const tasks = LIGAS.map(async (liga) => {
     try {
-      const match = await fetchLeague(league);
-      const odds = match.odds || {};
+      const [liveData, oddsData] = await Promise.all([fetchLive(liga), fetchOdds(liga)]);
 
-      const over25Prob = calcProb(odds['odd_over_2.5']);
-      const under25Prob = calcProb(odds['odd_under_2.5']);
-      const bttsProb = calcProb(odds['odd_ambas_sim']);
-      const bttsNaoProb = calcProb(odds['odd_ambas_nao']);
+      const jogos = oddsData?.jogos || [];
+      const primeiroJogo = jogos[0];
+      const timeA = primeiroJogo?.home?.split(' x ')[0]?.trim() || '—';
+      const timeB = primeiroJogo?.home?.split(' x ')[1]?.trim() || primeiroJogo?.away?.trim() || '—';
+      const odds = extractOdds(primeiroJogo);
 
-      if (over25Prob !== null) over25Values.push(over25Prob);
+      const recent_matches = jogos.slice(0, 80).map((j: any) => {
+        const home = j.home?.split(' x ')[0]?.trim() || '—';
+        const away = j.home?.split(' x ')[1]?.trim() || j.away?.trim() || '—';
+        const jOdds = extractOdds(j);
+        // Placar real quando disponível (convert_virtual.py extrai do JSON do caramelotips)
+        const score = j.score
+          ? `${j.score.home}-${j.score.away}`
+          : '—';
+        return {
+          timeA: home,
+          timeB: away,
+          score,
+          over25_odd: jOdds.over25 ? parseFloat(jOdds.over25) : null,
+          minuto: '—',
+        };
+      });
 
-      results[league] = {
-        match: {
-          id: match.id,
-          timeA: match.timeA,
-          timeB: match.timeB,
-          resultado: match.resultado,
-          resultadoHt: match.resultadoHt,
-          resultadoFt: match.resultadoFt,
-          minuto: match.minuto,
-          horario: match.horario,
-          primeiroMarcar: match.primeiroMarcar,
-          ultimoMarcar: match.ultimoMarcar,
-          vencedorHtFt: match.vencedorHtFt,
-          created_at: match.created_at,
-        },
-        odds: {
-          over25: odds['odd_over_2.5'],
-          under25: odds['odd_under_2.5'],
-          ambas_sim: odds['odd_ambas_sim'],
-          ambas_nao: odds['odd_ambas_nao'],
-          over15: odds['odd_over_1.5'],
-          under15: odds['odd_under_1.5'],
-          over35: odds['odd_over_3.5'],
-          under35: odds['odd_under_3.5'],
-          resultado_final_casa: odds.odd_resultado_final_casa,
-          resultado_final_empate: odds.odd_resultado_final_empate,
-          resultado_final_fora: odds.odd_resultado_final_fora,
-        },
-        prob: {
-          over25: over25Prob,
-          under25: under25Prob,
-          btts_sim: bttsProb,
-          btts_nao: bttsNaoProb,
+      const series = liveData?.series || {};
+
+      return {
+        liga,
+        data: {
+          match: {
+            timeA,
+            timeB,
+            resultado: '—',
+            resultadoHt: '—',
+            resultadoFt: '—',
+            minuto: '—',
+            horario: new Date().toLocaleTimeString('pt-BR'),
+          },
+          odds,
+          prob: extractProb(odds),
+          series: {
+            over25: series.over25?.slice(0, 80) || [],
+            over15: series.over15?.slice(0, 80) || [],
+            over35: series.over35?.slice(0, 80) || [],
+            btts_yes: series.btts_yes?.slice(0, 80) || [],
+            timestamps: series.timestamps?.slice(0, 80) || [],
+          },
+          total_jogos: liveData?.total_jogos || 0,
+          power: liveData?.power || null,
+          recent_matches,
         },
       };
-    } catch (err) {
-      console.warn(`[VirtualAPI] Falha ao buscar ${league}:`, (err as Error).message);
-      results[league] = { error: String(err) };
+    } catch (err: any) {
+      return {
+        liga,
+        data: { error: `DarkOdds indisponível: ${err.message}` },
+      };
     }
+  });
+
+  const settled = await Promise.allSettled(tasks);
+  const leagues: Record<string, any> = {};
+
+  for (const result of settled) {
+    if (result.status === 'fulfilled') {
+      leagues[result.value.liga] = result.value.data;
+    }
+    // Promise.allSettled + try/catch interno garante que nunca reject
   }
 
   return NextResponse.json({
     status: true,
-    leagues: results,
-    serie_over25: over25Values.length > 0 ? over25Values : null,
+    ligas_disponiveis: LIGAS,
+    leagues,
     atualizado_em: new Date().toISOString(),
   });
 }

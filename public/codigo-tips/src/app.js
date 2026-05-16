@@ -1,4 +1,4 @@
-console.log("%c CÓDIGO.TIPS v1.0.4 %c", "background:#ffb547;color:#000;padding:4px 8px;font-weight:bold;border-radius:4px;", "");
+console.log("%c CÓDIGO.TIPS v1.0.7 %c", "background:#ffb547;color:#000;padding:4px 8px;font-weight:bold;border-radius:4px;", "");
 /* ============================================================
    🚀 APP ENTRY POINT
    ============================================================
@@ -67,6 +67,7 @@ async function loadAndRender(marketKey) {
   App.dataSource = market.fonte;
   App.dataUpdated = market.atualizado;
   App.realPointCount = market.realCount || 0;
+  App.recent_matches = market.recent_matches || [];
 
   // Busca histórico em paralelo (não bloqueia)
   fetchHistory();
@@ -86,10 +87,9 @@ async function loadAndRender(marketKey) {
   App.state.zones = App.trendData.zones;
   App.state.trendlines = [...App.trendData.macroLines, ...App.trendData.microLines];
 
-  // Gera mosaico ANTES do scan pra que score predictors possam usar
-  // o histórico de placares simulados como referência empírica
-  App.mosaicGrid = generateScoresForMosaic(values, 20, 4);
-  App.state.recentScores = extractRecentScores(App.mosaicGrid, 30);
+  // MOSAICO REAL — usa recent_matches da DarkOdds (NUNCA sintético)
+  App.mosaicGrid = App.recent_matches;
+  App.state.recentScores = []; // scores reais indisponíveis via DarkOdds
 
   // 2. Fibonacci e Elliott
   App.fibData = computeFibonacci(values, cfg.fibWindow || 60);
@@ -152,19 +152,19 @@ function renderAllPanels() {
 }
 
 function renderMosaicGrid() {
-  const hours = App.mosaicHours || 24;
-  // Cada coluna do mosaico = ~4min de jogo. Em 1h cabem 15 jogos.
-  // Pra UI ficar fluida limitamos a ~30 colunas máx, com cada coluna
-  // representando vários jogos comprimidos.
-  const totalGames = hours * 15;
-  const cols = Math.min(30, Math.max(8, Math.ceil(hours * 1.25)));
-  const rows = 5;
+  // MOSAICO REAL — re-renderiza os recent_matches já carregados
+  // Se não houver dados, mostra mensagem de vazio
+  const matches = App.recent_matches || [];
 
-  // Gera grid com base na série atual
-  App.mosaicGrid = generateScoresForMosaic(App.state.values, cols, rows, totalGames / (cols * rows));
-  App.state.recentScores = extractRecentScores(App.mosaicGrid, 60);
+  if (!matches.length) {
+    const container = document.getElementById('mosaicGridLive');
+    if (container) container.innerHTML = '<div class="mosaic-empty">DarkOdds sem partidas disponíveis</div>';
+    const statsEl = document.getElementById('mosaicStatsLive');
+    if (statsEl) statsEl.innerHTML = '';
+    return;
+  }
 
-  renderMosaicLive(App.mosaicGrid, App.currentRule || 'over25', { hours });
+  renderMosaicLive(matches, App.currentRule || 'over25', {});
 }
 
 // ====== GRÁFICOS ======
@@ -534,7 +534,7 @@ function fetchHistory() {
   if (!panel) return;
   if (App.data && App.data.length) {
     const recent = App.data.slice(-20).map(d => d.value);
-    panel.innerHTML = '<h3>Histórico Acumulado (PulseScore)</h3><ul>' +
+    panel.innerHTML = '<h3>Histórico Acumulado (DarkOdds)</h3><ul>' +
       recent.map(v => '<li>' + v + '</li>').join('') + '</ul>';
   } else {
     panel.innerHTML = '<p>Carregando histórico...</p>';
@@ -953,104 +953,46 @@ function saveNotifyForm() {
   NotifConfig.save(cfg);
 }
 
-// ====== SIMULAÇÃO DE TEMPO REAL ======
-// A cada 30 segundos, adiciona um novo ponto à série pra simular nova rodada chegando.
-// Em produção, isso vira: WebSocket → recebe nova rodada → atualiza estado.
+// ====== ATUALIZAÇÃO EM TEMPO REAL ======
+// A cada 60 segundos, busca dados reais da API Bet365 Virtual.
+// Removeu a simulação de random walk — agora usa dados ao vivo.
+
+async function updateCurrentMatchPanel() {
+  try {
+    const res = await fetch('/api/virtual');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.leagues) return;
+    window.__LAST_MATCH = data.leagues;
+    const header = document.getElementById('hdrMarket');
+    const leagueData = data.leagues[App.currentMarket];
+    if (header && leagueData?.match) {
+      const m = leagueData.match;
+      const marketName = MARKETS[App.currentMarket]?.name || 'Copa';
+      header.innerHTML = `${marketName} <span class="hdr-source">🟢 Bet365 Virtual · ${m.timeA||'?'} vs ${m.timeB||'?'} [${m.resultado||'?'}] · ${m.minuto||'?'}'</span>`;
+    }
+  } catch (e) {
+    console.warn('[updateCurrentMatchPanel]', e.message);
+  }
+}
+
 function startLiveSimulation() {
-  setInterval(() => {
-    const last = App.state.values[App.state.values.length - 1];
-    const variation = (Math.random() - 0.5) * 6;
-    const next = Math.max(20, Math.min(70, Math.round(last + variation)));
+  // Atualiza painel de partidas e recarrega dados reais a cada 60s
+  setInterval(async () => {
+    // 1. Atualiza painel de partidas (leve, só match info)
+    await updateCurrentMatchPanel();
 
-    // Adiciona novo ponto
-    const lastTime = App.data[App.data.length - 1].time;
-    const newPoint = { time: lastTime + 240, value: next, index: App.data.length };
-    App.data.push(newPoint);
-
-    // Janela rolante: descarta o ponto mais antigo se ultrapassou TOTAL_ROUNDS_24H
-    if (App.data.length > TOTAL_ROUNDS_24H) {
-      App.data.shift();
-      // Reindexar pra manter coerência
-      App.data.forEach((p, i) => { p.index = i; });
+    // 2. Recarrega dados completos do mercado (gráfico + indicadores)
+    if (App._loading) return;
+    App._loading = true;
+    try {
+      await loadAndRender(App.currentMarket);
+    } catch (e) {
+      console.warn('[startLiveSimulation]', e.message);
+    } finally {
+      App._loading = false;
     }
-
-    // Recalcula tudo
-    const values = App.data.map(d => d.value);
-    const cfg = ConfigStore.load();
-    App.state = calculateAllIndicators(values, cfg);
-    const rawSignals = scanAllPatterns(App.state, App.data, cfg.minConfidence);
-    App.signals = dedupeSignals(rawSignals, cfg.signalSpacing || 4, cfg.maxMarkers || 25);
-    App.btResults = backtestSignals(App.signals, values, cfg.backtestHorizon);
-
-    // Em janela rolante, fazemos rebuild completo dos gráficos
-    // pra garantir consistência visual (a série inteira muda de offset).
-    // Caso contrário, só atualizamos o último ponto.
-    if (App.data.length === TOTAL_ROUNDS_24H) {
-      // Rebuild leve: atualiza dados de todas as séries de uma vez
-      App.series.goals.setData(App.data);
-  App.series.goals.applyOptions({ priceFormat: { type: 'price', precision: 0, minMove: 1 } });;
-      App.series.upper.setData(App.state.bands.upper.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
-      App.series.middle.setData(App.state.bands.middle.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
-      App.series.lower.setData(App.state.bands.lower.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
-      // MM9 atualizada
-      App.series.rsi.setData(App.state.rsi.map((v, i) => v !== null ? { time: App.data[i].time, value: v } : null).filter(Boolean));
-      App.series.macd.setData(App.state.mom.map((v, i) => v !== null ? {
-        time: App.data[i].time,
-        value: parseFloat(v.toFixed(2)),
-        color: v >= 0 ? 'rgba(38,194,129,0.85)' : 'rgba(239,68,68,0.85)',
-      } : null).filter(Boolean));
-    } else {
-      // Append incremental
-      const lastIdx = App.state.values.length - 1;
-      App.series.goals.update(newPoint);
-      if (App.state.bands.upper[lastIdx] !== null) {
-        App.series.upper.update({ time: newPoint.time, value: App.state.bands.upper[lastIdx] });
-        App.series.middle.update({ time: newPoint.time, value: App.state.bands.middle[lastIdx] });
-        App.series.lower.update({ time: newPoint.time, value: App.state.bands.lower[lastIdx] });
-      }
-      if (App.state.vwap[lastIdx] !== null) App.series.vwap.update({ time: newPoint.time, value: App.state.vwap[lastIdx] });
-      if (App.state.rsi[lastIdx] !== null) App.series.rsi.update({ time: newPoint.time, value: App.state.rsi[lastIdx] });
-      if (App.state.mom[lastIdx] !== null) App.series.macd.update({
-        time: newPoint.time,
-        value: parseFloat(App.state.mom[lastIdx].toFixed(2)),
-        color: App.state.mom[lastIdx] >= 0 ? 'rgba(38,194,129,0.85)' : 'rgba(239,68,68,0.85)',
-      });
-    }
-
-    // Recalcula markers (sinais + números) com dados atualizados
-    App.markers = App.signals.map(sig => ({
-      time: sig.time,
-      position: sig.direction === 'over' ? 'belowBar' : 'aboveBar',
-      color: sig.direction === 'over' ? '#26c281' : '#ef4444',
-      shape: sig.direction === 'over' ? 'arrowUp' : 'arrowDown',
-      size: 0,
-    }));
-    refreshMarkers();
-
-    renderAllPanels();
-    renderMosaicGrid();
-
-    // Atualiza a barra UTC depois que tudo foi recalculado
-    requestAnimationFrame(updateUTCTimeBar);
-
-    // Notifica TODOS os sinais novos que ainda não foram notificados.
-    // (Antes só notificava se dataIndex era do último ponto, o que era
-    // restritivo demais — sinais novos em pontos passados não disparavam.)
-    if (App.signals.length > 0) {
-      App.signals.forEach(sig => {
-        const sigKey = `${sig.dataIndex}-${sig.pattern}`;
-        if (!App.notifiedSignals.has(sigKey)) {
-          App.notifiedSignals.add(sigKey);
-          // Só dispara push/Telegram/Discord pros mais recentes
-          // (últimos 5 pontos da série) pra evitar floods em backfill
-          if (sig.dataIndex >= App.data.length - 5) {
-            showToast(sig);
-            notifyAll(sig);
-          }
-        }
-      });
-    }
-  }, 30000); // 30 segundos
+  }, 600000);
 }
 
 // ============================================================
@@ -1135,7 +1077,7 @@ function startFooterClock() {
       const lastTime = BR.hm(last.time);
       const marketName = MARKETS[App.currentMarket]?.name || 'Copa';
       document.getElementById('footerGameCurrent').textContent =
-        `${lastTime} · ${marketName} · ${last.value} gols`;
+        `${lastTime} · ${marketName} · Exp. ${last.value} gols`;
 
       // Próximo jogo: +4 min
       const nextTime = last.time + 240;

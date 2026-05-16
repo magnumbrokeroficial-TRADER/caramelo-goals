@@ -25,21 +25,6 @@
    PROBABILIDADE MÍNIMA: 60% (alinhado com filtro do projeto)
 ============================================================ */
 
-/* ----- HELPER: extrai placares recentes do grid do mosaico ----- */
-
-function extractRecentScores(mosaicGrid, lastN = 30) {
-  if (!mosaicGrid || mosaicGrid.length === 0) return [];
-  // Pega os últimos N placares de TODAS as linhas, considerando que
-  // as colunas mais à direita são as mais recentes
-  const flat = [];
-  for (let r = 0; r < mosaicGrid.length; r++) {
-    for (let c = 0; c < mosaicGrid[r].length; c++) {
-      flat.push(mosaicGrid[r][c]);
-    }
-  }
-  return flat.slice(-lastN);
-}
-
 /* ----- HELPER: frequência empírica de cada cenário ----- */
 
 function scoreFrequencies(scores) {
@@ -82,8 +67,8 @@ function predictZeroZero(state, i) {
   if (mom === null || rsi === null || lower === null) return null;
 
   const seriesAvg = state.values.reduce((a, b) => a + b, 0) / state.values.length;
-  const recentScores = state.recentScores || [];
-  const freq = scoreFrequencies(recentScores);
+  if (!state.recentScores?.length) return null;
+  const freq = scoreFrequencies(state.recentScores);
 
   // Componente TÉCNICO (60%): valor baixo + momento descendente + RSI fraco
   let techScore = 0;
@@ -134,8 +119,8 @@ function predictUnder35(state, i) {
   if (mom === null || rsi === null || middle === null) return null;
 
   const seriesAvg = state.values.reduce((a, b) => a + b, 0) / state.values.length;
-  const recentScores = state.recentScores || [];
-  const freq = scoreFrequencies(recentScores);
+  if (!state.recentScores?.length) return null;
+  const freq = scoreFrequencies(state.recentScores);
 
   let techScore = 0;
   if (v <= seriesAvg) techScore += 25;
@@ -184,8 +169,8 @@ function predictOver35(state, i) {
   if (mom === null || rsi === null || middle === null) return null;
 
   const seriesAvg = state.values.reduce((a, b) => a + b, 0) / state.values.length;
-  const recentScores = state.recentScores || [];
-  const freq = scoreFrequencies(recentScores);
+  if (!state.recentScores?.length) return null;
+  const freq = scoreFrequencies(state.recentScores);
 
   let techScore = 0;
   if (v > seriesAvg + 3) techScore += 25;
@@ -232,8 +217,8 @@ function predictOver45(state, i) {
   if (mom === null || rsi === null || upper === null) return null;
 
   const seriesAvg = state.values.reduce((a, b) => a + b, 0) / state.values.length;
-  const recentScores = state.recentScores || [];
-  const freq = scoreFrequencies(recentScores);
+  if (!state.recentScores?.length) return null;
+  const freq = scoreFrequencies(state.recentScores);
 
   let techScore = 0;
   if (v >= seriesAvg + 6) techScore += 30;
@@ -282,8 +267,8 @@ function predictFiveGoals(state, i) {
   if (mom === null || rsi === null || upper === null) return null;
 
   const seriesAvg = state.values.reduce((a, b) => a + b, 0) / state.values.length;
-  const recentScores = state.recentScores || [];
-  const freq = scoreFrequencies(recentScores);
+  if (!state.recentScores?.length) return null;
+  const freq = scoreFrequencies(state.recentScores);
 
   // Sequência crescente nas últimas 3 rodadas?
   const climbing = prev3.length === 3 && prev3[0] < prev3[1] && prev3[1] <= prev3[2];

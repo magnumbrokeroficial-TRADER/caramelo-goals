@@ -54,7 +54,7 @@ function renderIndicators(state, idx) {
   const posColor = pos > 75 ? 'var(--red)' : (pos < 25 ? 'var(--green)' : 'var(--yellow)');
 
   el.innerHTML = `
-    <div class="indicator-row"><span class="ind-label">📊 Total atual</span><span class="ind-value" style="color:var(--white-line)">${state.values[idx]}</span></div>
+    <div class="indicator-row"><span class="ind-label">📊 Exp. Gols</span><span class="ind-value" style="color:var(--white-line)">${state.values[idx]}</span></div>
     <div class="indicator-row"><span class="ind-label">📈 RSI</span><span class="ind-value" style="color:${rsiColor}">${r?.toFixed(1) || '--'}</span></div>
     <div class="indicator-row"><span class="ind-label">⚡ Momento</span><span class="ind-value" style="color:${momColor}">${(m > 0 ? '+' : '') + (m?.toFixed(2) || '--')}</span></div>
     <div class="indicator-row"><span class="ind-label">📍 Posição na banda</span><span class="ind-value" style="color:${posColor}">${pos.toFixed(0)}%</span></div>
