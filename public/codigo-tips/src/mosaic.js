@@ -1,149 +1,194 @@
 /* ================================================================
-   MOSAICO — Grade perfeita 20×N | Fonte: DarkOdds exclusivamente
+   MOSAICO — Grade exata estilo referência | DarkOdds
    ================================================================
-   20 COLUNAS FIXAS = posições de minuto
-   N LINHAS = uma por hora
-   Linha atual = preenchimento gradual esquerda→direita
-   Linhas passadas = 20 células sempre preenchidas (grade fechada)
+   H → G → % → linhas de hora → H (rodapé)
+   20 slots fixos: 01 04 07 10 ... 58 (step 3 min)
+   Verde = over (≥3 gols) | Vermelho = under
 =============================================================== */
 
-const MOSAIC_COLS = 20;
+const MOSAIC_MINUTE_SLOTS = [
+  '01','04','07','10','13','16','19','22','25','28',
+  '31','34','37','40','43','46','49','52','55','58'
+];
+const MOSAIC_COLS = MOSAIC_MINUTE_SLOTS.length; // 20
 
-// ============================================================
-// GERA TIMESTAMPS VIRTUAIS (API não fornece horário individual)
-// Cada partida virtual dura ~4 min
-// ============================================================
+// Timestamps virtuais (API não fornece horário por jogo)
 function assignTimestamps(matches) {
   const now = Date.now();
   return matches.map((m, i) => ({ ...m, _time: new Date(now - i * 240000) }));
 }
 
-// ============================================================
-// AGRUPA PARTIDAS POR HORA, ORDENADAS POR MINUTO
-// ============================================================
-function groupByHour(matches) {
-  const withTime = assignTimestamps(matches);
-  const groups = {};
+// Hora do jogo (do timestamp virtual)
+function mGetHour(m) {
+  if (m._time) return m._time.getHours().toString().padStart(2, '0');
+  return '--';
+}
+
+// Minuto do jogo (do timestamp virtual)
+function mGetMinute(m) {
+  if (m._time) return m._time.getMinutes().toString().padStart(2, '0');
+  return '--';
+}
+
+// Slot (0-19) baseado no minuto
+function mGetSlot(m) {
+  const min = parseInt(mGetMinute(m));
+  let best = 0, bestDiff = 999;
+  MOSAIC_MINUTE_SLOTS.forEach((s, i) => {
+    const diff = Math.abs(parseInt(s) - min);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  });
+  return best;
+}
+
+// Placar e gols (formato DarkOdds: score = "2-0")
+function mGetScore(m) {
+  if (!m.score || m.score === '—') return { hs: null, as: null, gols: 0 };
+  const parts = m.score.split('-');
+  const hs = parseInt(parts[0]) || 0;
+  const as = parseInt(parts[1]) || 0;
+  return { hs, as, gols: hs + as };
+}
+
+// Agrupar por hora → { "03": [null, match, null, ...], "04": [...] }
+function mGroupByHour(matches) {
+  const withTime = assignTimestamps(matches.slice(0, 400));
+  const hours = {};
   withTime.forEach(m => {
-    const h = m._time.getHours().toString().padStart(2, '0');
-    if (!groups[h]) groups[h] = [];
-    groups[h].push(m);
+    const h = mGetHour(m);
+    if (!hours[h]) hours[h] = new Array(MOSAIC_COLS).fill(null);
+    const slot = mGetSlot(m);
+    if (!hours[h][slot]) hours[h][slot] = m;
   });
-  // Sort each hour by minute ascending
-  Object.keys(groups).forEach(h => {
-    groups[h].sort((a, b) => a._time - b._time);
-  });
-  return groups;
-}
-
-function getCurrentHour() {
-  return new Date().getHours().toString().padStart(2, '0');
-}
-
-// ============================================================
-// CRIA CÉLULA INDIVIDUAL
-// ============================================================
-function buildCell(match, isEmpty) {
-  const cell = document.createElement('div');
-
-  if (isEmpty || !match) {
-    cell.style.cssText = `
-      background: #080808;
-      border: 1px solid #141414;
-      border-radius: 2px;
-      min-height: 40px;
-    `;
-    return cell;
-  }
-
-  // Parse score do formato DarkOdds: "2-0" ou "—"
-  const parts = match.score && match.score !== '—' ? match.score.split('-') : null;
-  const hs = parts ? parseInt(parts[0]) || 0 : null;
-  const as = parts ? parseInt(parts[1]) || 0 : null;
-  const hasScore = hs !== null;
-  const gols = (hs || 0) + (as || 0);
-  const isOver = gols >= 3;
-
-  let bg, br;
-  if (!hasScore)        { bg = '#0d0d0d'; br = '#2a2a2a'; }
-  else if (isOver)      { bg = '#0a1f0a'; br = '#1f5c1f'; }
-  else                  { bg = '#0a0a18'; br = '#18183a'; }
-
-  cell.style.cssText = `
-    background: ${bg};
-    border: 1px solid ${br};
-    border-radius: 2px;
-    padding: 2px 3px;
-    min-height: 40px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    cursor: pointer;
-    overflow: hidden;
-  `;
-
-  const min = match._time.getMinutes().toString().padStart(2, '0');
-  const scoreText = hasScore ? match.score : '⏳';
-  const scoreColor = !hasScore ? '#444' : isOver ? '#3dff3d' : '#999';
-
-  cell.innerHTML = `
-    <div style="color:#444;font-size:7px;font-family:monospace;margin-bottom:1px">${min}'</div>
-    <div style="color:${scoreColor};font-weight:700;font-size:10px;line-height:1">${scoreText}</div>
-    <div style="color:#444;font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-top:1px">
-      ${(match.timeA || '').split(' ')[0]}×${(match.timeB || '').split(' ')[0]}
-    </div>
-  `;
-
-  cell.title = `${min}' · ${match.timeA||'?'} vs ${match.timeB||'?'} · ${hasScore ? match.score+' ('+gols+' gols)' : 'Aguardando'}`;
-  return cell;
-}
-
-// ============================================================
-// CRIA UMA LINHA (1 HORA) — 20 CÉLULAS
-// ============================================================
-function buildHourRow(horaLabel, partidas, isCurrentHour) {
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = `display:flex; gap:0; width:100%; align-items:stretch; margin-bottom:2px;`;
-
-  // Label da hora (fixo, esquerda)
-  const label = document.createElement('div');
-  label.style.cssText = `
-    width: 36px; min-width: 36px;
-    background: #0d0d0d;
-    border: 1px solid #1a1a1a;
-    border-radius: 2px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 9px; font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    color: ${isCurrentHour ? '#ffcc00' : '#444'};
-    margin-right: 2px; flex-shrink: 0;
-  `;
-  label.textContent = horaLabel + 'h';
-  wrapper.appendChild(label);
-
-  // Grid das 20 células
-  const grid = document.createElement('div');
-  grid.style.cssText = `
-    display: grid;
-    grid-template-columns: repeat(${MOSAIC_COLS}, 1fr);
-    gap: 2px; flex: 1;
-  `;
-
-  for (let i = 0; i < MOSAIC_COLS; i++) {
-    const match = partidas[i] || null;
-    // Hora atual: células futuras (sem jogo) ficam vazias
-    // Horas passadas: todas as células preenchidas ou vazias (grade fechada)
-    grid.appendChild(buildCell(match, !match));
-  }
-
-  wrapper.appendChild(grid);
-  return wrapper;
+  return hours;
 }
 
 // ================================================================
-// FUNÇÃO PRINCIPAL DE RENDERIZAÇÃO
+// LINHA H — Cabeçalho de minutos (topo e rodapé)
+// ================================================================
+function mBuildHeaderRow() {
+  const row = document.createElement('div');
+  row.style.cssText = `display:grid; grid-template-columns:28px repeat(${MOSAIC_COLS},1fr); gap:1px; margin-bottom:1px;`;
+
+  const lh = document.createElement('div');
+  lh.style.cssText = `background:#111; color:#666; font-size:9px; font-family:'JetBrains Mono',monospace; display:flex; align-items:center; justify-content:center; border-radius:2px; padding:3px 0;`;
+  lh.textContent = 'H';
+  row.appendChild(lh);
+
+  MOSAIC_MINUTE_SLOTS.forEach(min => {
+    const c = document.createElement('div');
+    c.style.cssText = `background:#111; color:#aaa; font-size:9px; font-family:'JetBrains Mono',monospace; text-align:center; padding:3px 1px; border-radius:2px; font-weight:700;`;
+    c.textContent = min;
+    row.appendChild(c);
+  });
+  return row;
+}
+
+// ================================================================
+// LINHAS G e % — Estatísticas por coluna
+// ================================================================
+function mBuildStatsRows(hoursData) {
+  const allHours = Object.values(hoursData);
+
+  // G: total de gols por coluna
+  const golsRow = document.createElement('div');
+  golsRow.style.cssText = `display:grid; grid-template-columns:28px repeat(${MOSAIC_COLS},1fr); gap:1px; margin-bottom:1px;`;
+  const glabel = document.createElement('div');
+  glabel.style.cssText = `background:#111; color:#888; font-size:8px; font-family:'JetBrains Mono',monospace; display:flex; align-items:center; justify-content:center; border-radius:2px;`;
+  glabel.textContent = 'G';
+  golsRow.appendChild(glabel);
+
+  const pctRow = document.createElement('div');
+  pctRow.style.cssText = `display:grid; grid-template-columns:28px repeat(${MOSAIC_COLS},1fr); gap:1px; margin-bottom:2px;`;
+  const plabel = document.createElement('div');
+  plabel.style.cssText = `background:#111; color:#888; font-size:8px; font-family:'JetBrains Mono',monospace; display:flex; align-items:center; justify-content:center; border-radius:2px;`;
+  plabel.textContent = '%';
+  pctRow.appendChild(plabel);
+
+  for (let col = 0; col < MOSAIC_COLS; col++) {
+    let totalGols = 0, totalJogos = 0, overCount = 0;
+    allHours.forEach(slots => {
+      const m = slots[col];
+      if (!m) return;
+      const { gols } = mGetScore(m);
+      totalGols += gols;
+      totalJogos++;
+      if (gols >= 3) overCount++;
+    });
+
+    const gc = document.createElement('div');
+    gc.style.cssText = `background:#0d1a0d; color:#4cff4c; font-size:8px; font-family:'JetBrains Mono',monospace; text-align:center; padding:2px 1px; border-radius:2px; font-weight:700;`;
+    gc.textContent = totalGols || '';
+    golsRow.appendChild(gc);
+
+    const overPct  = totalJogos ? Math.round(overCount / totalJogos * 100) : 0;
+    const underPct = totalJogos ? 100 - overPct : 0;
+    const pc = document.createElement('div');
+    pc.style.cssText = `background:#0d0d0d; font-size:7px; font-family:'JetBrains Mono',monospace; text-align:center; padding:1px; border-radius:2px; display:flex; flex-direction:column; line-height:1.3;`;
+    pc.innerHTML = `<span style="color:#4cff4c">${overPct}</span><span style="color:#ff4c4c">${underPct}</span>`;
+    pctRow.appendChild(pc);
+  }
+
+  return [golsRow, pctRow];
+}
+
+// ================================================================
+// LINHA DE UMA HORA
+// ================================================================
+function mBuildHourRow(horaLabel, slots, isCurrentHour) {
+  const row = document.createElement('div');
+  row.style.cssText = `display:grid; grid-template-columns:28px repeat(${MOSAIC_COLS},1fr); gap:1px; margin-bottom:1px;`;
+
+  // Label da hora
+  const lbl = document.createElement('div');
+  lbl.style.cssText = `
+    background:#111;
+    color:${isCurrentHour ? '#ffcc00' : '#666'};
+    font-size:9px;
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:2px;
+  `;
+  lbl.textContent = horaLabel;
+  row.appendChild(lbl);
+
+  slots.forEach(m => {
+    const cell = document.createElement('div');
+    if (!m || !m.score || m.score === '—') {
+      cell.style.cssText = `background:#0a0a0a; border:1px solid #111; border-radius:2px; min-height:28px;`;
+      row.appendChild(cell);
+      return;
+    }
+
+    const { hs, as, gols } = mGetScore(m);
+    const isOver = gols >= 3;
+    const bg = isOver ? '#0a2e0a' : '#2e0a0a';
+    const scoreColor = isOver ? '#4cff4c' : '#ff6666';
+
+    cell.style.cssText = `
+      background:${bg};
+      border-radius:2px;
+      min-height:28px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:10px;
+      font-weight:700;
+      font-family:'JetBrains Mono',monospace;
+      color:${scoreColor};
+      cursor:pointer;
+    `;
+    cell.textContent = `${hs}-${as}`;
+    cell.title = `${mGetHour(m)}:${mGetMinute(m)} · ${m.timeA||'?'} vs ${m.timeB||'?'} · ${gols} gols`;
+    row.appendChild(cell);
+  });
+
+  return row;
+}
+
+// ================================================================
+// RENDERIZAÇÃO PRINCIPAL
 // ================================================================
 function renderMosaic(matches) {
   const container = document.getElementById('mosaicGridLive');
@@ -153,54 +198,43 @@ function renderMosaic(matches) {
   }
 
   if (!matches || !matches.length) {
-    container.innerHTML = '<div style="padding:16px;color:#555;font-family:monospace;font-size:11px;">⬛ Nenhum jogo disponível — aguardando DarkOdds...</div>';
+    container.innerHTML = '<div style="padding:16px;color:#555;font-family:monospace;font-size:11px;">⬛ Nenhum jogo — aguardando DarkOdds...</div>';
     return;
   }
 
-  const groups      = groupByHour(matches);
-  const horasKeys   = Object.keys(groups).sort(); // oldest first
-  const currentHour = getCurrentHour();
+  const hoursData   = mGroupByHour(matches);
+  const hoursKeys   = Object.keys(hoursData).sort(); // oldest first
+  const currentHour = new Date().getHours().toString().padStart(2, '0');
 
   container.innerHTML = '';
+  container.style.cssText = `padding:4px 8px; box-sizing:border-box; overflow-x:auto;`;
 
-  // Header
-  const hdr = document.createElement('div');
-  hdr.style.cssText = `
-    padding: 6px 8px 4px;
-    font-size: 9px;
-    color: #555;
-    font-family: 'JetBrains Mono', monospace;
-    border-bottom: 1px solid #141414;
-    margin-bottom: 3px;
-  `;
-  hdr.textContent = `⬛ Mosaico DarkOdds — ${matches.length} jogos · ${horasKeys.length}h · ${MOSAIC_COLS} colunas`;
-  container.appendChild(hdr);
+  // Linha H (topo)
+  container.appendChild(mBuildHeaderRow());
 
-  // Corpo: linhas por hora
-  const body = document.createElement('div');
-  body.style.cssText = `display:flex; flex-direction:column; padding:4px 6px;`;
+  // Linhas G e %
+  const [golsRow, pctRow] = mBuildStatsRows(hoursData);
+  container.appendChild(golsRow);
+  container.appendChild(pctRow);
 
-  horasKeys.forEach(hora => {
-    const isCurrent = hora === currentHour;
-    body.appendChild(buildHourRow(hora, groups[hora], isCurrent));
+  // Linhas de hora
+  hoursKeys.forEach(hora => {
+    container.appendChild(mBuildHourRow(hora, hoursData[hora], hora === currentHour));
   });
 
-  container.appendChild(body);
-  console.log(`[MOSAICO] ${horasKeys.length}h × ${MOSAIC_COLS} col · hora atual: ${currentHour}h`);
+  // Linha H (rodapé)
+  container.appendChild(mBuildHeaderRow());
+
+  console.log(`[MOSAICO] ${hoursKeys.length} horas × ${MOSAIC_COLS} colunas · ${matches.length} jogos`);
 }
 
-// ================================================================
-// COMPATIBILIDADE COM APP.JS (renderMosaicGrid → renderMosaicLive)
-// ================================================================
-// Aliases para compatibilidade com app.js
+// Alias compat app.js
 function renderMosaicLive(matches, rule, options) {
   renderMosaic(matches);
 }
-// App.js chama renderMosaic(App.mosaicGrid, App.currentRule) em event listeners
-// renderMosaic já está no escopo global (cada script é um módulo solto)
 
 // ================================================================
-// CARREGA DA DARKODDS VIA PROXY LOCAL
+// CARREGA DA DARKODDS + POLLING 30s
 // ================================================================
 async function loadMosaicData() {
   try {
@@ -209,7 +243,6 @@ async function loadMosaicData() {
     const data = await res.json();
 
     let matches = [];
-    // Tenta extrair partidas em qualquer formato que a API retornar
     if (data.recent_matches && data.recent_matches.length) {
       matches = data.recent_matches;
     } else if (data.matches && data.matches.length) {
@@ -219,7 +252,6 @@ async function loadMosaicData() {
     } else if (Array.isArray(data)) {
       matches = data;
     } else if (data.leagues) {
-      // Pega da primeira liga disponível
       const keys = Object.keys(data.leagues);
       for (const k of keys) {
         if (data.leagues[k]?.recent_matches?.length) {
@@ -230,16 +262,15 @@ async function loadMosaicData() {
     }
 
     if (!matches.length) {
-      console.warn('[MOSAICO] API retornou 0 jogos — verificar DarkOdds');
+      console.warn('[MOSAICO] API retornou 0 jogos');
       return;
     }
 
     renderMosaic(matches);
   } catch (err) {
-    console.error('[MOSAICO] Erro ao carregar DarkOdds:', err.message);
+    console.error('[MOSAICO] Erro:', err.message);
   }
 }
 
-// Init + polling 30s
 loadMosaicData();
 setInterval(loadMosaicData, 30000);
