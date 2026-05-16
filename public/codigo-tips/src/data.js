@@ -8,7 +8,7 @@
 
 // ⚠️ URL do backend DarkOdds. Em produção, o ngrok pode mudar.
 // Atualize o env var DARKODDS_URL no Vercel quando o túnel mudar.
-const API_BASE_URL = 'https://rambling-crafty-riveting.ngrok-free.dev';
+const API_BASE_URL = (typeof window !== 'undefined' && window.__DARKODDS_URL__) || 'https://rambling-crafty-riveting.ngrok-free.dev';
 
 // Cache em memória pra evitar refetch desnecessário (TTL 2 min)
 const apiCache = {
