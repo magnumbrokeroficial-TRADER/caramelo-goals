@@ -161,12 +161,28 @@
       '</div>';
   }
 
+  function renderEmpty() {
+    var existing = document.getElementById(WRAP_ID);
+    if (existing) return; // já tem gauge renderizado, não substituir por vazio
+    var mg = document.getElementById('mosaicGridLive');
+    if (mg && mg.parentNode) {
+      mg.parentNode.insertAdjacentHTML('beforeend',
+        '<div id="' + WRAP_ID + '" style="padding:20px 12px;border-top:1px solid #222;background:#0d0d1a;text-align:center;font-family:monospace;font-size:11px;color:#555;">' +
+        '⏳ Aguardando dados para gerar o gauge de fluxo de gols...</div>');
+    }
+  }
+
   function render() {
     var liga = getActiveLiga();
     var stats = computeStats(liga);
-    if (!stats) return;
 
     var existing = document.getElementById(WRAP_ID);
+    if (!stats) {
+      if (existing) existing.remove();
+      renderEmpty();
+      return;
+    }
+
     if (existing) existing.remove();
 
     var html = renderGauge(stats, liga);
@@ -177,16 +193,43 @@
   }
 
   function init() {
-    function tryInit(n) {
-      if (n > 20) return;
+    function tryRender(attempt) {
+      if (attempt > 20) return;
+
       if (window.__LAST_MATCH && Object.keys(window.__LAST_MATCH).length) {
         render();
         return;
       }
-      setTimeout(function () { tryInit(n + 1); }, 500);
+
+      // Intercepta a próxima atribuição de window.__LAST_MATCH
+      if (attempt === 0) {
+        var origDesc = Object.getOwnPropertyDescriptor(window, '__LAST_MATCH');
+        if (!origDesc || origDesc.configurable) {
+          var currentVal = window.__LAST_MATCH;
+          Object.defineProperty(window, '__LAST_MATCH', {
+            configurable: true,
+            enumerable: true,
+            get: function () { return currentVal; },
+            set: function (val) {
+              currentVal = val;
+              setTimeout(render, 100);
+            },
+          });
+        }
+      }
+
+      setTimeout(function () { tryRender(attempt + 1); }, 500);
     }
-    tryInit(0);
+    tryRender(0);
+
+    // Mostra placeholder enquanto dados não chegam
+    setTimeout(function () {
+      if (!document.getElementById(WRAP_ID)) renderEmpty();
+    }, 2000);
+
+    // Periodic re-render
     setInterval(render, 5000);
+
     var qs = document.getElementById('qtdJogosSelect');
     if (qs) qs.addEventListener('change', function () { setTimeout(render, 800); });
   }
