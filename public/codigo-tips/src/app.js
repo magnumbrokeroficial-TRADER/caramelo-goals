@@ -195,7 +195,7 @@ const chartCommon = {
     vertLine: { color: '#ffb547', width: 1, style: 2 },
     horzLine: { color: '#ffb547', width: 1, style: 2 },
   },
-  rightPriceScale: { borderColor: '#1f1f1f' },
+  rightPriceScale: { borderColor: '#1f1f1f', scaleMargins: { top: 0.10, bottom: 0.10 } },
   timeScale: {
     borderColor: '#1f1f1f',
     timeVisible: true,
