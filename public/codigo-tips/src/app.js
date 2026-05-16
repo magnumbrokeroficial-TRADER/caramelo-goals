@@ -1,4 +1,4 @@
-console.log("%c CÓDIGO.TIPS v1.0.7 %c", "background:#ffb547;color:#000;padding:4px 8px;font-weight:bold;border-radius:4px;", "");
+console.log("%c CÓDIGO.TIPS v1.0.8 %c", "background:#ffb547;color:#000;padding:4px 8px;font-weight:bold;border-radius:4px;", "");
 /* ============================================================
    🚀 APP ENTRY POINT
    ============================================================
@@ -891,7 +891,7 @@ function setupEventListeners() {
     const token = document.getElementById('tgToken').value.trim();
     const chatId = document.getElementById('tgChatId').value.trim();
     saveNotifyForm();
-    const result = await sendTelegram(token, chatId, '🎯 *Teste Caramelo Goals*\n\nSe você está vendo isso, as notificações Telegram estão funcionando!');
+    const result = await sendTelegram(token, chatId, '🎯 *Teste CODIGO.TIPS*\n\nSe você está vendo isso, as notificações Telegram estão funcionando!');
     const status = document.getElementById('tgStatus');
     status.textContent = result.msg;
     status.className = `notify-status ${result.ok ? 'ok' : 'err'}`;
@@ -918,7 +918,7 @@ function setupEventListeners() {
     saveNotifyForm();
     const fakeSignal = {
       pattern: 'TESTE', direction: 'over', confidence: 99,
-      message: 'Esta é uma mensagem de teste do Caramelo Goals.',
+      message: 'Esta é uma mensagem de teste do CODIGO.TIPS.',
       market: ['Over 2.5 FT'], value: 50,
       checks: [{ name: 'Conexão Discord', passed: true, detail: 'OK' }],
     };
