@@ -117,46 +117,6 @@
         <div id="macdChart" class="chart-canvas"></div>
       </div>
     </div>
-
-    <!-- ===== MOSAIC NO RODAPÉ ===== -->
-    <div class="mosaic-section">
-      <div class="mosaic-controls">
-        <div class="mosaic-title-area">
-          <span class="mosaic-icon">🧩</span>
-          <span class="mosaic-title-text">Mosaico de Resultados</span>
-        </div>
-        <div class="mosaic-control-group">
-          <label class="mosaic-control-label">⏱ Horas</label>
-          <select id="mosaicHoursSelect" class="mosaic-select">
-            <option value="3">3h</option>
-            <option value="6">6h</option>
-            <option value="8">8h</option>
-            <option value="12">12h</option>
-            <option value="18">18h</option>
-            <option value="24" selected>24h</option>
-          </select>
-        </div>
-        <div class="mosaic-control-group">
-          <label class="toggle-pill">
-            <input type="checkbox" id="tgShowTeams">
-            <span>👥 Times</span>
-          </label>
-          <label class="toggle-pill">
-            <input type="checkbox" id="tgShowOdds">
-            <span>💰 Odds</span>
-          </label>
-        </div>
-        <div class="mosaic-stats" id="mosaicStatsLive"></div>
-      </div>
-      <div class="mosaic-grid" id="mosaicGridLive"></div>
-    </div>
-
-    <!-- Widget de análise de ciclo -->
-    <section class="analyst-section" style="padding: 8px 16px;">
-      <div id="analystWidget">
-        <div style="color:#555; font-size:12px; font-family:monospace; padding:8px;">Carregando análise...</div>
-      </div>
-    </section>
   </section>
 
   <!-- RIGHT: CURRENT ALERT + INDICATORS + BACKTEST -->
@@ -182,6 +142,45 @@
     </div>
   </aside>
 </main>
+  <!-- ===== MOSAIC NO RODAPÉ ===== -->
+  <div class="mosaic-section">
+    <div class="mosaic-controls">
+      <div class="mosaic-title-area">
+        <span class="mosaic-icon">🧩</span>
+        <span class="mosaic-title-text">Mosaico de Resultados</span>
+      </div>
+      <div class="mosaic-control-group">
+        <label class="mosaic-control-label">⏱ Horas</label>
+        <select id="mosaicHoursSelect" class="mosaic-select">
+          <option value="3">3h</option>
+          <option value="6">6h</option>
+          <option value="8">8h</option>
+          <option value="12">12h</option>
+          <option value="18">18h</option>
+          <option value="24" selected>24h</option>
+        </select>
+      </div>
+      <div class="mosaic-control-group">
+        <label class="toggle-pill">
+          <input type="checkbox" id="tgShowTeams">
+          <span>👥 Times</span>
+        </label>
+        <label class="toggle-pill">
+          <input type="checkbox" id="tgShowOdds">
+          <span>💰 Odds</span>
+        </label>
+      </div>
+      <div class="mosaic-stats" id="mosaicStatsLive"></div>
+    </div>
+    <div class="mosaic-grid" id="mosaicGridLive"></div>
+  </div>
+
+  <!-- Widget de análise de ciclo -->
+  <section class="analyst-section" style="padding: 8px 16px;">
+    <div id="analystWidget">
+      <div style="color:#555; font-size:12px; font-family:monospace; padding:8px;">Carregando análise...</div>
+    </div>
+  </section>
 
 <footer>
   <div class="status-dot"></div>
