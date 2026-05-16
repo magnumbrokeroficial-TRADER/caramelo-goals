@@ -338,21 +338,6 @@
 .dp{color:#26c281!important}\
 .dn{color:#ef4444!important}\
 .dz{color:#444!important}\
-.df-chart-section{padding:0 12px 8px}\
-.df-chart-legend{\
-  display:flex;\
-  gap:16px;\
-  font-size:10px;\
-  color:#666;\
-  margin-bottom:4px;\
-  align-items:center;\
-}\
-.df-legend-item{display:flex;align-items:center;gap:4px}\
-.df-legend-line{display:inline-block;width:16px;height:2px;border-radius:1px}\
-.df-legend-solid{background:#26c281}\
-.df-legend-dashed{background:#8b95b1;background-image:linear-gradient(to right,#8b95b1 4px,transparent 4px);background-size:8px 2px;background-repeat:repeat-x}\
-.df-chart-wrap{height:180px;position:relative}\
-.df-chart-wrap canvas{width:100%!important;height:180px!important}\
 .df-ops-panel{\
   display:grid;\
   grid-template-columns:1fr 1fr;\
@@ -393,108 +378,97 @@
   padding:12px;\
   font-size:11px;\
   text-align:center;\
+}\
+.df-match-panel{\
+  margin:8px 12px;\
+  background:#0d1a2a;\
+  border-radius:6px;\
+  padding:12px;\
+}\
+.df-match-header{\
+  font-size:10px;\
+  font-weight:600;\
+  color:#8b95b1;\
+  text-transform:uppercase;\
+  margin-bottom:8px;\
+  letter-spacing:0.5px;\
+}\
+.df-match-teams{\
+  display:flex;\
+  align-items:center;\
+  justify-content:space-between;\
+  margin-bottom:8px;\
+}\
+.df-team{\
+  font-size:13px;\
+  font-weight:600;\
+  color:#e0e0e0;\
+  flex:1;\
+}\
+.df-team-right{\
+  text-align:right;\
+}\
+.df-score{\
+  font-size:18px;\
+  font-weight:700;\
+  color:#fff;\
+  margin:0 16px;\
+}\
+.df-match-odds{\
+  display:flex;\
+  gap:8px;\
+  margin-bottom:8px;\
+}\
+.df-odd-box{\
+  flex:1;\
+  background:#0d0d1a;\
+  border:1px solid #222;\
+  border-radius:4px;\
+  padding:6px 8px;\
+  text-align:center;\
+}\
+.df-odd-label{\
+  display:block;\
+  font-size:9px;\
+  color:#8b95b1;\
+}\
+.df-odd-val{\
+  display:block;\
+  font-size:13px;\
+  font-weight:700;\
+  color:#e0e0e0;\
+}\
+.df-match-prob{\
+  display:flex;\
+  gap:8px;\
+  margin-bottom:8px;\
+}\
+.df-prob-item{\
+  flex:1;\
+  text-align:center;\
+  font-size:11px;\
+  font-weight:600;\
+}\
+.df-match-signal{\
+  text-align:center;\
+  padding-top:6px;\
+  border-top:1px solid #222;\
+}\
+.df-signal-text{\
+  font-size:11px;\
+  color:#8b95b1;\
+}\
+.df-signal-regime{\
+  font-size:10px;\
+  margin-top:2px;\
+}\
+.df-match-empty{\
+  color:#555;\
+  font-size:11px;\
+  text-align:center;\
+  padding:12px;\
 }';
     document.head.appendChild(css);
-  }
-
-  // ================================================================
-  // CHART
-  // ================================================================
-
-  function renderChart(lastRow) {
-    if (!window.Chart) {
-      console.warn('[DeltaFlow] Chart.js não disponível');
-      return;
-    }
-
-    if (DF.chart) {
-      DF.chart.destroy();
-      DF.chart = null;
-    }
-
-    var canvas = document.getElementById('dfChart');
-    if (!canvas) return;
-
-    var labels = [];
-    var rawData = [];
-    var accData = [];
-    var cum = 0;
-    for (var i = 0; i < lastRow.length; i++) {
-      labels.push('J' + (i + 1));
-      rawData.push(lastRow[i]);
-      cum += lastRow[i];
-      accData.push(cum);
-    }
-
-    // Use last accumulated value for line colour
-    var finalAcc = accData.length > 0 ? accData[accData.length - 1] : 0;
-    var lineColor = finalAcc >= 0 ? '#26c281' : '#ef4444';
-
-    DF.chart = new Chart(canvas, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: 'Delta Acumulado',
-            data: accData,
-            borderColor: lineColor,
-            backgroundColor: finalAcc >= 0
-              ? 'rgba(38,194,129,0.08)'
-              : 'rgba(239,68,68,0.08)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 2,
-            pointBackgroundColor: function (ctx) {
-              return (ctx.dataset.data[ctx.dataIndex] || 0) >= 0 ? '#26c281' : '#ef4444';
-            },
-            segment: {
-              borderColor: function (ctx) {
-                return (ctx.p1.parsed.y || 0) >= 0 ? '#26c281' : '#ef4444';
-              },
-            },
-          },
-          {
-            label: 'Delta por slot',
-            data: rawData,
-            borderColor: '#555',
-            borderDash: [4, 3],
-            backgroundColor: 'transparent',
-            tension: 0.3,
-            pointRadius: 2,
-            pointBackgroundColor: '#555',
-            pointBorderColor: '#555',
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 300 },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#1a1a2e',
-            titleColor: '#e0e0e0',
-            bodyColor: '#e0e0e0',
-            borderColor: '#333',
-            borderWidth: 1,
-            padding: 6,
-            bodyFont: { size: 11 },
-          },
-        },
-        scales: {
-          x: {
-            ticks: { color: '#555', font: { size: 9 }, maxTicksLimit: 20 },
-            grid: { color: 'rgba(255,255,255,0.03)' },
-          },
-          y: {
-            ticks: { color: '#555', font: { size: 9 } },
-            grid: { color: 'rgba(255,255,255,0.03)' },
-          },
-        },
-      },
-    });
   }
 
   // ================================================================
@@ -642,13 +616,64 @@
     h += '</tbody></table>';
     h += '</div></div>';
 
-    // 5. Chart section
-    h += '<div class="df-chart-section">';
-    h += '<div class="df-chart-legend">';
-    h += '<span class="df-legend-item"><span class="df-legend-solid"></span> Delta acumulado</span>';
-    h += '<span class="df-legend-item"><span class="df-legend-dashed"></span> Delta por slot</span>';
-    h += '</div>';
-    h += '<div class="df-chart-wrap"><canvas id="dfChart"></canvas></div>';
+    // 5. Match panel (current game)
+    var marketBtn = document.querySelector('.market-btn.active');
+    var currentMarket = marketBtn ? marketBtn.getAttribute('data-market') : 'copa';
+    var leagueData = window.__LAST_MATCH ? window.__LAST_MATCH[currentMarket] : null;
+
+    h += '<div class="df-match-panel" style="border-left:4px solid ' + rColor + ';">';
+    h += '<div class="df-match-header">🔴 ' + currentMarket.toUpperCase() + ' · AO VIVO</div>';
+
+    if (leagueData && leagueData.match) {
+      var m = leagueData.match;
+      var odds = leagueData.odds || {};
+      var prob = leagueData.prob || {};
+
+      var score = m.resultado && m.resultado !== '—' ? m.resultado : '0×0';
+      h += '<div class="df-match-teams">';
+      h += '<span class="df-team">' + m.timeA + '</span>';
+      h += '<span class="df-score">' + score + '</span>';
+      h += '<span class="df-team df-team-right">' + m.timeB + '</span>';
+      h += '</div>';
+
+      h += '<div class="df-match-odds">';
+      if (odds.over25) {
+        h += '<div class="df-odd-box"><span class="df-odd-label">Over 2.5</span><span class="df-odd-val">' + odds.over25 + '</span></div>';
+      }
+      if (odds.btts_sim) {
+        h += '<div class="df-odd-box"><span class="df-odd-label">BTTS Sim</span><span class="df-odd-val">' + odds.btts_sim + '</span></div>';
+      }
+      var underOdds = odds.under25 || (odds.over25 ? (parseFloat(odds.over25) / (parseFloat(odds.over25) - 1)).toFixed(2) : null);
+      if (underOdds) {
+        h += '<div class="df-odd-box"><span class="df-odd-label">Under 2.5</span><span class="df-odd-val">' + underOdds + '</span></div>';
+      }
+      h += '</div>';
+
+      h += '<div class="df-match-prob">';
+      if (prob.over25 != null) {
+        var pc1 = prob.over25 > 50 ? '#26c281' : '#ef4444';
+        h += '<div class="df-prob-item" style="color:' + pc1 + ';">Over 2.5 ' + prob.over25 + '%</div>';
+      }
+      if (prob.under25 != null) {
+        var pc2 = prob.under25 > 50 ? '#26c281' : '#ef4444';
+        h += '<div class="df-prob-item" style="color:' + pc2 + ';">Under 2.5 ' + prob.under25 + '%</div>';
+      }
+      if (prob.btts_sim != null) {
+        var pc3 = prob.btts_sim > 50 ? '#26c281' : '#ef4444';
+        h += '<div class="df-prob-item" style="color:' + pc3 + ';">BTTS Sim ' + prob.btts_sim + '%</div>';
+      }
+      h += '</div>';
+
+      var arrow = isOverFav ? '▲' : isUnderFav ? '▼' : '◆';
+      var direction = isOverFav ? 'OVER' : isUnderFav ? 'UNDER' : 'NEUTRO';
+      var sigColor = isOverFav ? '#26c281' : isUnderFav ? '#ef4444' : '#8b95b1';
+      h += '<div class="df-match-signal">';
+      h += '<div class="df-signal-text">Delta Flow indica: <span style="color:' + sigColor + ';font-weight:700;">' + arrow + ' ' + direction + '</span> para este jogo</div>';
+      h += '<div class="df-signal-regime" style="color:' + rColor + ';">Regime: ' + regime.charAt(0).toUpperCase() + regime.slice(1) + '</div>';
+      h += '</div>';
+    } else {
+      h += '<div class="df-match-empty">⏳ Aguardando dados do jogo atual...</div>';
+    }
     h += '</div>';
 
     // 6. Operations panel
@@ -695,11 +720,6 @@
     h += '<div class="df-footer">' + getFooterText(regime, posCount, negCount, momentum) + '</div>';
 
     container.innerHTML = h;
-
-    // Chart
-    if (lastRow) {
-      renderChart(lastRow);
-    }
 
     // Wire interval buttons
     var intBtns = container.querySelectorAll('.df-int-btn');
