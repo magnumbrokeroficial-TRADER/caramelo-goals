@@ -1,23 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const DARKODDS_URL = process.env.DARKODDS_URL || 'https://rambling-crafty-riveting.ngrok-free.dev';
-
+const CARAMELO_BASE = 'https://www.caramelotips.com.br/final/bet365';
 const LIGAS = ['copa', 'euro', 'super', 'premier'];
 
-const LIGA_ICON: Record<string, string> = {
-  copa: '🏆', euro: '🌍', super: '💥', premier: '🏴',
-};
-
-async function fetchOdds(liga: string) {
-  const resp = await fetch(`${DARKODDS_URL}/api/odds?liga=${encodeURIComponent(liga)}`, {
-    headers: { 'ngrok-skip-browser-warning': 'true' },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!resp.ok) throw new Error(`odds HTTP ${resp.status}`);
-  return resp.json();
+interface ParsedGame {
+  timeA: string;
+  timeB: string;
+  score?: { home: number; away: number; total: number };
+  odds: Record<string, string>;
 }
 
-function extractOdds(jogo: any) {
+function parseCell(text: string): ParsedGame | null {
+  if (!text || text.length < 10) return null;
+
+  const odds: Record<string, string> = {};
+  const patterns: Record<string, RegExp> = {
+    over25: /o25@(\d+\.\d+)/,
+    under25: /u25@(\d+\.\d+)/,
+    over15: /o15@(\d+\.\d+)/,
+    under15: /u15@(\d+\.\d+)/,
+    over35: /o35@(\d+\.\d+)/,
+    under35: /u35@(\d+\.\d+)/,
+    btts_sim: /ambs@(\d+\.\d+)/,
+    btts_nao: /ambn@(\d+\.\d+)/,
+    fte: /fte@(\d+\.\d+)/,
+  };
+
+  for (const [key, regex] of Object.entries(patterns)) {
+    const m = text.match(regex);
+    if (m) odds[key] = m[1];
+  }
+
+  // Precisa ter pelo menos over25 ou fte para ser jogo válido
+  if (!odds.over25 && !odds.fte) return null;
+
+  const lines = text.trim().split('\n');
+  const matchName = lines[0]?.trim();
+  if (!matchName || !matchName.includes(' x ')) return null;
+
+  const [timeA, timeB] = matchName.split(' x ').map((s: string) => s.trim());
+
+  let score: { home: number; away: number; total: number } | undefined;
+  if (lines[1]) {
+    const sm = lines[1].match(/^(\d+)\s*[-–]\s*(\d+)/);
+    if (sm) {
+      const h = parseInt(sm[1]);
+      const a = parseInt(sm[2]);
+      score = { home: h, away: a, total: h + a };
+    }
+  }
+
+  return { timeA, timeB, score, odds };
+}
+
+function extractOdds(jogo: any): Record<string, string | null> {
   const odds: Record<string, string | null> = {
     over25: null, under25: null,
     over15: null, under15: null,
@@ -69,52 +105,71 @@ export async function GET(request: NextRequest) {
   const windowParam = request.nextUrl.searchParams.get('window');
   const windowSize = parseInt(windowParam || '20');
 
-  async function fetchLiveWindow(liga: string) {
-    const url = `${DARKODDS_URL}/api/live?liga=${encodeURIComponent(liga)}&limit=${limit}&window=${windowSize}`;
-    const resp = await fetch(url, {
-      headers: { 'ngrok-skip-browser-warning': 'true' },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!resp.ok) throw new Error(`live HTTP ${resp.status}`);
-    return resp.json();
-  }
-
   const tasks = LIGAS.map(async (liga) => {
     try {
-      const [liveData, oddsData] = await Promise.all([fetchLiveWindow(liga), fetchOdds(liga)]);
-
-      const jogos = oddsData?.jogos || [];
-      const primeiroJogo = jogos[0];
-      const timeA = primeiroJogo?.home?.split(' x ')[0]?.trim() || '—';
-      const timeB = primeiroJogo?.home?.split(' x ')[1]?.trim() || primeiroJogo?.away?.trim() || '—';
-      const odds = extractOdds(primeiroJogo);
-
-      const recent_matches = jogos.slice(0, limit).map((j: any) => {
-        const home = j.home?.split(' x ')[0]?.trim() || '—';
-        const away = j.home?.split(' x ')[1]?.trim() || j.away?.trim() || '—';
-        const jOdds = extractOdds(j);
-        // Placar real quando disponível (convert_virtual.py extrai do JSON do caramelotips)
-        const score = j.score
-          ? `${j.score.home}-${j.score.away}`
-          : '—';
-        return {
-          timeA: home,
-          timeB: away,
-          score,
-          over25_odd: jOdds.over25 ? parseFloat(jOdds.over25) : null,
-          minuto: '—',
-        };
+      const url = `${CARAMELO_BASE}/${liga}.json`;
+      const resp = await fetch(url, {
+        signal: AbortSignal.timeout(15000),
       });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-      const series = liveData?.series || {};
+      const data: any = await resp.json();
+      const rows: any[] = data?.table?.rows || [];
+      if (rows.length === 0) throw new Error('JSON vazio ou sem tabela');
+
+      const allGames: ParsedGame[] = [];
+
+      for (const row of rows) {
+        const cells: any[] = row.c || [];
+        if (cells.length < 2) continue;
+        // cell[0] = número da linha, cells[1..n-3] = jogos, últimas 3 = agregados
+        for (let i = 1; i < cells.length - 3; i++) {
+          const cell = cells[i];
+          const text = typeof cell === 'object' && cell !== null
+            ? String(cell.v || '')
+            : String(cell || '');
+          const parsed = parseCell(text);
+          if (parsed) allGames.push(parsed);
+        }
+      }
+
+      if (allGames.length === 0) throw new Error('Nenhum jogo válido encontrado');
+
+      const primeiro = allGames[0];
+      const odds = {
+        over25: primeiro.odds.over25 || null,
+        under25: primeiro.odds.under25 || null,
+        btts_sim: primeiro.odds.btts_sim || null,
+        btts_nao: primeiro.odds.btts_nao || null,
+      };
+
+      const recent_matches = allGames.slice(0, limit).map((g) => ({
+        timeA: g.timeA,
+        timeB: g.timeB,
+        score: g.score ? `${g.score.home}-${g.score.away}` : '—',
+        over25_odd: g.odds.over25 ? parseFloat(g.odds.over25) : null,
+        minuto: '—',
+      }));
+
+      // total_goals: rolling sum com janela configurável
+      const scoredGames = allGames.filter((g) => g.score);
+      const totalGoals: number[] = [];
+      for (let i = 0; i < scoredGames.length; i++) {
+        const start = Math.max(0, i - windowSize + 1);
+        const sum = scoredGames.slice(start, i + 1).reduce((a, b) => a + (b.score?.total || 0), 0);
+        totalGoals.push(sum);
+      }
+      // Pula pontos com janela incompleta
+      const rollingStart = Math.min(windowSize - 1, totalGoals.length - 1);
+      const total_goals = totalGoals.slice(rollingStart, rollingStart + limit).reverse();
 
       return {
         liga,
         data: {
           match: {
-            timeA,
-            timeB,
-            resultado: '—',
+            timeA: primeiro.timeA,
+            timeB: primeiro.timeB,
+            resultado: primeiro.score ? `${primeiro.score.home}-${primeiro.score.away}` : '—',
             resultadoHt: '—',
             resultadoFt: '—',
             minuto: '—',
@@ -123,22 +178,17 @@ export async function GET(request: NextRequest) {
           odds,
           prob: extractProb(odds),
           series: {
-            total_goals: series.total_goals?.slice(0, limit) || [],
-            over25: series.over25?.slice(0, limit) || [],
-            over15: series.over15?.slice(0, limit) || [],
-            over35: series.over35?.slice(0, limit) || [],
-            btts_yes: series.btts_yes?.slice(0, limit) || [],
-            timestamps: series.timestamps?.slice(0, limit) || [],
+            total_goals,
           },
-          total_jogos: liveData?.total_jogos || 0,
-          power: liveData?.power || null,
+          total_jogos: allGames.length,
+          power: null,
           recent_matches,
         },
       };
     } catch (err: any) {
       return {
         liga,
-        data: { error: `DarkOdds indisponível: ${err.message}` },
+        data: { error: `Caramelotips indisponível: ${err.message}` },
       };
     }
   });
@@ -150,7 +200,6 @@ export async function GET(request: NextRequest) {
     if (result.status === 'fulfilled') {
       leagues[result.value.liga] = result.value.data;
     }
-    // Promise.allSettled + try/catch interno garante que nunca reject
   }
 
   return NextResponse.json({
