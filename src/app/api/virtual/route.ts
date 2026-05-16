@@ -8,15 +8,6 @@ const LIGA_ICON: Record<string, string> = {
   copa: '🏆', euro: '🌍', super: '💥', premier: '🏴',
 };
 
-async function fetchLive(liga: string, limit: number) {
-  const resp = await fetch(`${DARKODDS_URL}/api/live?liga=${encodeURIComponent(liga)}&limit=${limit}`, {
-    headers: { 'ngrok-skip-browser-warning': 'true' },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!resp.ok) throw new Error(`live HTTP ${resp.status}`);
-  return resp.json();
-}
-
 async function fetchOdds(liga: string) {
   const resp = await fetch(`${DARKODDS_URL}/api/odds?liga=${encodeURIComponent(liga)}`, {
     headers: { 'ngrok-skip-browser-warning': 'true' },
@@ -75,9 +66,22 @@ function extractProb(odds: Record<string, string | null>): Record<string, number
 export async function GET(request: NextRequest) {
   const limitParam = request.nextUrl.searchParams.get('limit');
   const limit = Math.min(Math.max(parseInt(limitParam || '360'), 10), 500);
+  const windowParam = request.nextUrl.searchParams.get('window');
+  const windowSize = parseInt(windowParam || '20');
+
+  async function fetchLiveWindow(liga: string) {
+    const url = `${DARKODDS_URL}/api/live?liga=${encodeURIComponent(liga)}&limit=${limit}&window=${windowSize}`;
+    const resp = await fetch(url, {
+      headers: { 'ngrok-skip-browser-warning': 'true' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) throw new Error(`live HTTP ${resp.status}`);
+    return resp.json();
+  }
+
   const tasks = LIGAS.map(async (liga) => {
     try {
-      const [liveData, oddsData] = await Promise.all([fetchLive(liga, limit), fetchOdds(liga)]);
+      const [liveData, oddsData] = await Promise.all([fetchLiveWindow(liga), fetchOdds(liga)]);
 
       const jogos = oddsData?.jogos || [];
       const primeiroJogo = jogos[0];
