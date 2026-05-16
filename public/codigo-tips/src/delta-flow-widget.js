@@ -515,10 +515,11 @@
     // Reverse: oldest first (window.__LAST_MATCH: most recent first)
     allMatches = allMatches.slice().reverse();
 
-    // Read time filter
-    var hoursSelect = document.getElementById('mosaicHoursSelect');
-    var numBlocks = hoursSelect ? parseInt(hoursSelect.value) : 6;
-    if (isNaN(numBlocks) || numBlocks < 2) numBlocks = 6;
+    // Read qtd. jogos from the global filter
+    var qtdSelect = document.getElementById('qtdJogosSelect');
+    var totalJogos = qtdSelect ? parseInt(qtdSelect.value) : 480;
+    var numBlocks = Math.floor(totalJogos / BLOCK_SIZE);
+    if (isNaN(numBlocks) || numBlocks < 2) numBlocks = 3;
 
     var totalNeeded = numBlocks * BLOCK_SIZE;
     var sliced = allMatches.slice(0, totalNeeded);
@@ -774,10 +775,10 @@
     }
     tryRender();
 
-    // Listen to hours select change
-    var hoursSelect = document.getElementById('mosaicHoursSelect');
-    if (hoursSelect) {
-      hoursSelect.addEventListener('change', function () {
+    // Listen to qtd. jogos select change
+    var qtdSelect = document.getElementById('qtdJogosSelect');
+    if (qtdSelect) {
+      qtdSelect.addEventListener('change', function () {
         setTimeout(render, 600);
       });
     }
