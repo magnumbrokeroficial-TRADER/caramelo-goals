@@ -174,8 +174,8 @@ function renderMosaicGrid() {
 
   // Filtra pela janela de horas selecionada (afeta quantos tiles mostrar)
   const hours = App.mosaicHours || 24;
-  const hoursMap = { 3: 10, 6: 20, 8: 30, 12: 40, 18: 60, 24: 80 };
-  const maxByHours = hoursMap[hours] || 80;
+  const hoursMap = { 3: 60, 6: 120, 8: 160, 12: 240, 18: 360, 24: 480 };
+  const maxByHours = hoursMap[hours] || 480;
   const matches = allMatches.slice(0, maxByHours);
 
   renderMosaicLive(matches, App.currentRule || 'over25', {});
