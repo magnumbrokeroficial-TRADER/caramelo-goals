@@ -26,7 +26,7 @@ body {
   color: var(--text-primary);
   font-family: 'Bricolage Grotesque', sans-serif;
   height: 100vh;
-  overflow: hidden;
+  overflow-y: auto;
   display: grid;
   grid-template-rows: 56px 44px 1fr 32px;
 }
@@ -76,7 +76,7 @@ header {
 main {
   display: grid;
   grid-template-columns: 280px 1fr 320px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* ============== SIDEBAR ============== */
@@ -108,14 +108,14 @@ main {
 .market-tag { background: var(--bg-deep); color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 9px; padding: 2px 6px; border-radius: 3px; margin-top: 6px; display: inline-block; border: 1px solid var(--border); }
 
 /* ============== CHART AREA ============== */
-.chart-area { background: var(--bg-deep); display: flex; flex-direction: column; overflow: hidden; }
+.chart-area { background: var(--bg-deep); display: flex; flex-direction: column; overflow: visible; }
 .chart-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
 .symbol-info { display: flex; align-items: center; gap: 14px; }
 .symbol-name { font-size: 18px; font-weight: 700; color: var(--text-primary); }
 .symbol-sub { font-size: 12px; color: var(--text-secondary); padding-left: 14px; border-left: 1px solid var(--border); }
 .last-value { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700; color: var(--white-line); }
 
-.charts-container { flex: 1.5; display: grid; grid-template-rows: 2.5fr 1fr 1fr; overflow: hidden; min-height: 0; }
+.charts-container { flex: none; height: calc(100vh - 180px); display: grid; grid-template-rows: 2.5fr 1fr 1fr; overflow: hidden; min-height: 0; }
 .chart-block { position: relative; border-bottom: 1px solid var(--border); min-height: 0; }
 .chart-block:last-child { border-bottom: none; }
 
@@ -934,9 +934,8 @@ main {
   border-top: 1px solid var(--border);
   padding: 12px 16px 14px;
   flex-shrink: 0;
-  min-height: 360px;
-  max-height: 500px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .mosaic-header {
