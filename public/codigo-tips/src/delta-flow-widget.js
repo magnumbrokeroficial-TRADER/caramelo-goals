@@ -223,7 +223,9 @@
     css.id = 'df-styles';
     css.textContent = '\
 .delta-flow-widget {\
-  margin-top:12px;\
+  flex-shrink:0;\
+  width:100%;\
+  margin-top:16px;\
   background:#0d0d1a;\
   border:1px solid #222;\
   border-radius:6px;\
@@ -727,7 +729,7 @@
     // Check if widget already exists
     if (document.getElementById('delta-flow-widget')) return;
 
-    // Inject into mosaic-section footer
+    // Inject inside mosaic-section (fix: parent was BODY due to insertBefore logic)
     var mosaicSection = document.querySelector('.mosaic-section');
     if (!mosaicSection) return;
 
@@ -735,32 +737,40 @@
     widget.id = 'delta-flow-widget';
     widget.className = 'delta-flow-widget';
 
-    // Insert as last child of mosaic-section
-    // (the <footer> is actually below mosaic-section, so we just append)
-    // But keep the analyst-section below if present
-    var analystSection = document.querySelector('.analyst-section');
-    if (analystSection && analystSection.parentNode === mosaicSection.parentNode) {
-      mosaicSection.parentNode.insertBefore(widget, analystSection);
-    } else {
-      // Fallback: insert after mosaicGridLive, before any siblings
-      var mosaicGrid = document.getElementById('mosaicGridLive');
-      if (mosaicGrid && mosaicGrid.parentNode === mosaicSection) {
-        // Append to mosaic-section
-        mosaicSection.appendChild(widget);
-      } else {
-        // Fallback directly inside body works too
-        var container = document.querySelector('.mosaic-section');
-        if (container) container.appendChild(widget);
-      }
-    }
+    mosaicSection.appendChild(widget);
 
-    // Wait for data, then render
-    function tryRender() {
-      if (window.__LAST_MATCH && Object.keys(window.__LAST_MATCH).length) {
+    // Wait for data, then render (Fix B+C: polling + setter intercept)
+    function tryRender(attempt) {
+      attempt = attempt || 0;
+      if (attempt > 60) return; // desiste após 30s
+
+      var lm = window.__LAST_MATCH;
+      var hasData = lm &&
+        Object.keys(lm).some(function (k) { return lm[k] && lm[k].recent_matches && lm[k].recent_matches.length > 0; });
+
+      if (hasData) {
         render();
-      } else {
-        setTimeout(tryRender, 500);
+        return;
       }
+
+      // Intercepta a próxima atribuição de window.__LAST_MATCH
+      if (attempt === 0) {
+        var orig = Object.getOwnPropertyDescriptor(window, '__LAST_MATCH');
+        if (!orig || orig.configurable) {
+          var currentVal = window.__LAST_MATCH;
+          Object.defineProperty(window, '__LAST_MATCH', {
+            configurable: true,
+            enumerable: true,
+            get: function () { return currentVal; },
+            set: function (val) {
+              currentVal = val;
+              setTimeout(render, 100);
+            },
+          });
+        }
+      }
+
+      setTimeout(function () { tryRender(attempt + 1); }, 500);
     }
     tryRender();
 
