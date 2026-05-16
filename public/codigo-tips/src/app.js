@@ -1006,6 +1006,13 @@ function startLiveSimulation() {
       App._loading = false;
     }
   }, 600000);
+
+  // MOSAICO: re-renderiza a cada 30s com dados já carregados
+  setInterval(() => {
+    if (App.recent_matches && App.recent_matches.length > 0) {
+      renderMosaicGrid();
+    }
+  }, 30000);
 }
 
 // ============================================================
