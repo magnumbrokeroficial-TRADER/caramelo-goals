@@ -4,7 +4,7 @@
 
 ## 🎯 Contexto do Projeto
 
-O usuário (Victor) é o dono do site **caramelotips.com.br** — um sistema próprio de análise de futebol virtual.
+O usuário (Victor) é o dono do site **codigo-tips.vercel.app/codigo-tips/** — um sistema próprio de análise de futebol virtual.
 
 A grande sacada do projeto: ele descobriu que **gols por janela móvel se comportam como uma série temporal financeira**, então tudo que funciona em trading (RSI, Bollinger, MACD, padrões de candlestick) pode ser adaptado pra prever quando vão sair mais ou menos gols na próxima rodada.
 

@@ -18,7 +18,7 @@
   ],
   "author": "Caramelo",
   "license": "PROPRIETARY",
-  "homepage": "https://caramelotips.com.br",
+  "homepage": "https://codigo-tips.vercel.app/codigo-tips/",
   "dependencies": {},
   "devDependencies": {
     "serve": "^14.0.0"
