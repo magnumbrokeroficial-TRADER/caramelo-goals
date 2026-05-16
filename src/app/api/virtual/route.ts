@@ -117,6 +117,7 @@ export async function GET() {
           odds,
           prob: extractProb(odds),
           series: {
+            total_goals: series.total_goals?.slice(0, 80) || [],
             over25: series.over25?.slice(0, 80) || [],
             over15: series.over15?.slice(0, 80) || [],
             over35: series.over35?.slice(0, 80) || [],

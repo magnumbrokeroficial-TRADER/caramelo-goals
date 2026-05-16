@@ -1077,7 +1077,7 @@ function startFooterClock() {
       const lastTime = BR.hm(last.time);
       const marketName = MARKETS[App.currentMarket]?.name || 'Copa';
       document.getElementById('footerGameCurrent').textContent =
-        `${lastTime} · ${marketName} · Exp. ${last.value} gols`;
+        `${lastTime} · ${marketName} · Últ: ${last.value} gols`;
 
       // Próximo jogo: +4 min
       const nextTime = last.time + 240;

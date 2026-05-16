@@ -167,22 +167,22 @@ async function loadMarket(marketKey = 'copa') {
       throw new Error(leagueData?.error || 'Liga não disponível');
     }
 
-    // Pega a série REAL de 80 pontos da DarkOdds
+    // Pega a série de GOLS REAIS INTEIROS (prioridade total_goals)
     const series = leagueData.series || {};
-    const rawValues = series.over25;
+    const rawValues = series.total_goals && series.total_goals.length >= 3
+      ? series.total_goals
+      : series.over25;
 
     if (!rawValues || rawValues.length < 5) {
       throw new Error(`DarkOdds sem dados para ${marketKey}`);
     }
 
-    // Timestamps reais quando disponíveis, senão step de 4min
-    const timestamps = series.timestamps;
-    const startTime = timestamps && timestamps.length === rawValues.length
-      ? new Date(timestamps[0])
-      : new Date(now.getTime() - (rawValues.length - 1) * 240 * 1000);
+    // Timestamps: total_goals não tem timestamps próprios — usa step fixo
+    const startTime = new Date(now.getTime() - (rawValues.length - 1) * 240 * 1000);
 
     const match = leagueData.match || {};
-    console.log(`[VirtualAPI] ${marketKey}: ${match.timeA||'?'} vs ${match.timeB||'?'} [${match.resultado||'?'}] series.over25 length=${rawValues.length} (real)`);
+    const seriesLabel = series.total_goals?.length >= 3 ? 'total_goals' : 'over25';
+    console.log(`[VirtualAPI] ${marketKey}: ${match.timeA||'?'} vs ${match.timeB||'?'} [${match.resultado||'?'}] ${seriesLabel} length=${rawValues.length} (real)`);
 
     return {
       name: fallback.name,
