@@ -2,84 +2,93 @@
 
 import { useState, useEffect } from 'react';
 
-interface Signal {
-  liga: string;
-  mercado: string;
-  odd: number;
-  direcao: string;
-  rsi: number | null;
-  rsi14: number | null;
-  rsi7: number | null;
-  preco_vs_vwap: string;
-  banda: string;
-  macd_hist: number | null;
-  tipo: string;
-  decisao: {
-    deve_apostar: boolean;
-    confianca: number;
-    justificativa: string;
-    odd_estimada: number;
-    valor_sugerido: number;
-    direcao: string;
-  };
+interface AnalysisItem {
+  column: number;
+  game: string;
+  time: string;
+  goalsThisHour: number;
+  history: number[];
+  components: { vertical: number; heat: number; lateral: number; z: number };
+  contributions: { vertical: number; heat: number; lateral: number; z: number };
+  score: number;
+  pOver: number;
+  pUnder: number;
+  band: string;
+  action: string;
 }
 
 interface AnalystData {
-  liga: string;
-  status: string;
-  mensagem?: string;
-  total_jogos: number;
-  total_sinais?: number;
-  atualizado_em: string;
-  power?: {
-    league_lambda?: number;
-    btts_baseline?: number;
-    avg_total_goals?: number;
+  ok: boolean;
+  hour: number;
+  generatedAt: string;
+  meta: {
+    historicalHours: number;
+    globalMean: number;
+    globalStd: number;
+    weights: { vertical: number; heat: number; lateral: number; z: number };
   };
-  sinais: Signal[];
+  summary: {
+    strongSignals: number;
+    bestOver: AnalysisItem;
+    bestUnder: AnalysisItem;
+  };
+  analysis: AnalysisItem[];
 }
 
-function SignalCard({ s }: { s: Signal }) {
-  const d = s.decisao;
-  const confianca_pct = d.confianca || s.rsi || 50;
-  const cor_confianca = confianca_pct >= 70 ? 'text-green-400' : confianca_pct >= 50 ? 'text-yellow-400' : 'text-red-400';
+const CONFIDENCE_COLORS: Record<string, string> = {
+  'muito alta': 'text-green-400',
+  'alta': 'text-green-300',
+  'média': 'text-yellow-400',
+  'baixa': 'text-red-400',
+};
+
+function SignalCard({ item }: { item: AnalysisItem }) {
+  const isOver = item.pOver >= 50;
+  const confidence = isOver ? item.pOver : item.pUnder;
+  const bandLower = item.band.toLowerCase();
+  const confidenceColor = confidence >= 75 ? 'text-green-400' : confidence >= 65 ? 'text-green-300' : confidence >= 55 ? 'text-yellow-400' : 'text-red-400';
+  const barColor = bandLower.includes('forte') ? (isOver ? 'bg-green-500' : 'bg-red-500') : 'bg-yellow-500';
+  const bgBorder = bandLower.includes('forte') ? 'border-amber-500/40' : 'border-[#2a2a2a]';
 
   return (
-    <div className="bg-[#141414] border border-[#2a2a2a] rounded-xl p-4 hover:border-amber-500/40 transition">
+    <div className={`bg-[#141414] border ${bgBorder} rounded-xl p-4 hover:border-amber-500/40 transition`}>
       <div className="flex items-center justify-between mb-3">
         <div>
-          <span className="text-xs text-gray-500 uppercase tracking-wide">{s.mercado}</span>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">{item.game}</span>
+          <span className="ml-2 px-2 py-0.5 rounded text-xs bg-[#1f1f1f] text-gray-400">{item.time}</span>
           <span className={`ml-2 px-2 py-0.5 rounded text-xs font-bold ${
-            d.deve_apostar ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-500'
+            bandLower.includes('forte') ? 'bg-amber-900/40 text-amber-400' : 'bg-gray-800 text-gray-500'
           }`}>
-            {d.deve_apostar ? '✅ APOSTAR' : '⚠️ AGUARDAR'}
+            {item.action}
           </span>
         </div>
-        <span className="text-2xl font-bold text-amber-400">R$ {d.valor_sugerido?.toFixed(2) || '9,90'}</span>
+        <span className={`text-2xl font-bold ${isOver ? 'text-green-400' : 'text-red-400'}`}>
+          {isOver ? 'OVER' : 'UNDER'}
+        </span>
       </div>
 
       <div className="grid grid-cols-4 gap-3 mb-3">
         <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
-          <div className="text-xs text-gray-500">Odd</div>
-          <div className="text-lg font-bold text-white">{s.odd?.toFixed(2) || '-'}</div>
-        </div>
-        <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
-          <div className="text-xs text-gray-500">RSI 14</div>
-          <div className={`text-lg font-bold ${
-            s.rsi14 && s.rsi14 < 30 ? 'text-green-400' : s.rsi14 && s.rsi14 > 70 ? 'text-red-400' : 'text-white'
-          }`}>{s.rsi14?.toFixed(1) || '-'}</div>
-        </div>
-        <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
-          <div className="text-xs text-gray-500">RSI 7</div>
-          <div className={`text-lg font-bold ${
-            s.rsi7 && s.rsi7 < 25 ? 'text-green-400' : s.rsi7 && s.rsi7 > 75 ? 'text-red-400' : 'text-white'
-          }`}>{s.rsi7?.toFixed(1) || '-'}</div>
-        </div>
-        <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
-          <div className="text-xs text-gray-500">Vs VWAP</div>
-          <div className={`text-lg font-bold ${s.preco_vs_vwap === 'acima' ? 'text-green-400' : 'text-red-400'}`}>
-            {s.preco_vs_vwap === 'acima' ? '▲' : '▼'}
+          <div className="text-xs text-gray-500">pOver</div>
+          <div className={`text-lg font-bold ${item.pOver >= 65 ? 'text-green-400' : item.pOver <= 35 ? 'text-red-400' : 'text-white'}`}>
+            {item.pOver.toFixed(1)}%
           </div>
+        </div>
+        <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
+          <div className="text-xs text-gray-500">pUnder</div>
+          <div className={`text-lg font-bold ${item.pUnder >= 65 ? 'text-red-400' : item.pUnder <= 35 ? 'text-green-400' : 'text-white'}`}>
+            {item.pUnder.toFixed(1)}%
+          </div>
+        </div>
+        <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
+          <div className="text-xs text-gray-500">Score</div>
+          <div className={`text-lg font-bold ${item.score > 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {item.score.toFixed(3)}
+          </div>
+        </div>
+        <div className="bg-[#0a0a0a] rounded-lg p-2 text-center">
+          <div className="text-xs text-gray-500">Gols/Hora</div>
+          <div className="text-lg font-bold text-white">{item.goalsThisHour}</div>
         </div>
       </div>
 
@@ -87,29 +96,34 @@ function SignalCard({ s }: { s: Signal }) {
         <span className="text-xs text-gray-400">Confiança:</span>
         <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all ${
-              confianca_pct >= 70 ? 'bg-green-500' : confianca_pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-            }`}
-            style={{ width: `${confianca_pct}%` }}
+            className={`h-full rounded-full transition-all ${barColor}`}
+            style={{ width: `${confidence}%` }}
           />
         </div>
-        <span className={`text-xs font-bold ${cor_confianca}`}>{confianca_pct}%</span>
+        <span className={`text-xs font-bold ${confidenceColor}`}>{confidence.toFixed(0)}%</span>
       </div>
 
-      {d.justificativa && (
-        <p className="text-sm text-gray-400 italic">💡 {d.justificativa}</p>
+      {item.history && item.history.length > 0 && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-xs text-gray-500">Histórico:</span>
+          <div className="flex gap-1">
+            {item.history.map((g, i) => (
+              <span key={i} className={`text-xs px-1.5 py-0.5 rounded ${g > 0 ? 'bg-green-900/40 text-green-400' : 'bg-gray-800 text-gray-500'}`}>
+                {g}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
-      <div className="mt-2 flex gap-1.5">
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1f1f1f] text-gray-500">{s.tipo}</span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1f1f1f] text-gray-500">{s.banda}</span>
-        {s.macd_hist !== null && (
-          <span className={`text-[10px] px-1.5 py-0.5 rounded bg-[#1f1f1f] ${
-            s.macd_hist > 0 ? 'text-green-500' : 'text-red-500'
-          }`}>
-            MACD {s.macd_hist > 0 ? '+' : ''}{s.macd_hist?.toFixed(3)}
+      <div className="mt-2 flex gap-1.5 flex-wrap">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1f1f1f] text-gray-500">{item.band}</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1f1f1f] text-gray-500">{item.action}</span>
+        {item.components && Object.entries(item.components).map(([k, v]) => (
+          <span key={k} className={`text-[10px] px-1.5 py-0.5 rounded bg-[#1f1f1f] ${Number(v) > 0 ? 'text-green-500' : Number(v) < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+            {k}: {Number(v).toFixed(2)}
           </span>
-        )}
+        ))}
       </div>
     </div>
   );
@@ -117,7 +131,6 @@ function SignalCard({ s }: { s: Signal }) {
 
 export default function AnalystPanel() {
   const [data, setData] = useState<AnalystData | null>(null);
-  const [liga, setLiga] = useState('copa');
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -128,9 +141,7 @@ export default function AnalystPanel() {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
-      const res = await fetch(`/api/analyst?liga=${liga}&no-ai=true`, {
-        signal: controller.signal,
-      });
+      const res = await fetch('/api/analyst', { signal: controller.signal });
       clearTimeout(timeoutId);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
@@ -138,25 +149,44 @@ export default function AnalystPanel() {
       setLastUpdate(new Date());
     } catch (err: any) {
       setErro(err.name === 'AbortError'
-        ? '⏱️ Tempo limite excedido. DarkOdds pode estar lenta com 681 jogos.'
-        : `❌ Backend offline. DarkOdds API não respondeu. (${err.message})`);
+        ? '⏱️ Tempo limite excedido.'
+        : `❌ API não respondeu. (${err.message})`);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setErro(null);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        const res = await fetch('/api/analyst?t=' + Date.now(), {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (cancelled) return;
+        setData(json);
+        setLastUpdate(new Date());
+      } catch (err: any) {
+        if (cancelled) return;
+        setErro(err.name === 'AbortError'
+          ? '⏱️ Tempo limite excedido.'
+          : `❌ API não respondeu. (${err.message})`);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
     load();
-    const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
-  }, [liga]);
-
-  const ligas = [
-    { key: 'copa', label: '🏆 Copa' },
-    { key: 'euro', label: '🌍 Euro' },
-    { key: 'super', label: '💥 Super' },
-    { key: 'premier', label: '🏴 Premier' },
-  ];
+    const id = setInterval(load, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-200">
@@ -165,13 +195,13 @@ export default function AnalystPanel() {
         <div className="flex items-center gap-3">
           <span className="text-lg font-bold text-amber-400">⚽ Caramelo Goals</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-            Analista Técnico IA
+            Analista de Colunas
           </span>
         </div>
         <div className="flex items-center gap-3">
-          {data?.power && (
+          {data?.meta && (
             <span className="text-xs text-gray-500">
-              λ={data.power.league_lambda?.toFixed(2)} | BTTS={data.power.btts_baseline}%
+              Média={data.meta.globalMean.toFixed(2)} | σ={data.meta.globalStd.toFixed(2)}
             </span>
           )}
           {lastUpdate && (
@@ -182,21 +212,8 @@ export default function AnalystPanel() {
         </div>
       </header>
 
-      {/* League selector */}
+      {/* Status bar */}
       <div className="px-4 py-3 flex items-center gap-2 border-b border-[#1f1f1f]">
-        {ligas.map(l => (
-          <button
-            key={l.key}
-            onClick={() => setLiga(l.key)}
-            className={`px-3 py-1.5 rounded-lg text-sm transition ${
-              liga === l.key
-                ? 'bg-amber-500 text-black font-bold'
-                : 'bg-[#1f1f1f] text-gray-400 hover:text-white'
-            }`}
-          >
-            {l.label}
-          </button>
-        ))}
         <div className="ml-auto flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : 'bg-green-500'}`} />
           <span className="text-xs text-gray-500">{loading ? 'Analisando...' : 'Online'}</span>
@@ -215,7 +232,7 @@ export default function AnalystPanel() {
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
               <div className="text-4xl mb-4 animate-pulse">📊</div>
-              <p className="text-gray-500">Analisando séries de odds com indicadores técnicos...</p>
+              <p className="text-gray-500">Analisando colunas do Bet365 Virtual...</p>
             </div>
           </div>
         )}
@@ -224,7 +241,7 @@ export default function AnalystPanel() {
           <div className="flex items-center justify-center py-20">
             <div className="text-center max-w-md">
               <div className="text-5xl mb-4">🚫</div>
-              <h2 className="text-xl text-red-400 mb-2">Erro de conexao</h2>
+              <h2 className="text-xl text-red-400 mb-2">Erro de conexão</h2>
               <p className="text-gray-500 mb-4">{erro}</p>
               <button
                 onClick={load}
@@ -236,52 +253,61 @@ export default function AnalystPanel() {
           </div>
         )}
 
-        {data && data.status === 'sem_sinais' && (
-          <div className="text-center py-16">
-            <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-xl text-gray-400 mb-2">Nenhum sinal no momento</h2>
-            <p className="text-gray-600 max-w-md mx-auto">
-              {data.mensagem || 'Os indicadores estão neutros. O analista monitora RSI, Bollinger, VWAP e MACD em busca de padrões de big odds.'}
-            </p>
-            <div className="mt-6 flex justify-center gap-6 text-sm text-gray-500">
-              <div>
-                <div className="text-amber-400 font-bold">{data.total_jogos}</div>
-                <div>Jogos na base</div>
-              </div>
-              <div>
-                <div className="text-amber-400 font-bold">{data.power?.avg_total_goals?.toFixed(2) || '-'}</div>
-                <div>Média de gols</div>
-              </div>
-              <div>
-                <div className="text-amber-400 font-bold">{data.power?.btts_baseline || '-'}%</div>
-                <div>BTTS base</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {data && data.sinais && data.sinais.length > 0 && (
+        {data && data.analysis && data.analysis.length > 0 && (
           <>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-white">
-                🎯 {data.total_sinais} sinais encontrados
+                🎯 {data.summary.strongSignals} sinais fortes
               </h2>
               <span className="text-xs text-gray-500">
-                Odd mínima: 2.00 | RSI extremo + confirmação VWAP
+                Hora {String(data.hour).padStart(2, '0')}h · {data.analysis.length} colunas analisadas
               </span>
             </div>
+
+            {/* Destaques */}
+            {data.summary && (
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-[#141414] border border-green-500/30 rounded-xl p-3">
+                  <div className="text-xs text-gray-500 mb-1">Melhor OVER</div>
+                  <div className="text-lg font-bold text-green-400">
+                    {data.summary.bestOver.game} — {data.summary.bestOver.pOver.toFixed(1)}%
+                  </div>
+                  <div className="text-xs text-gray-500">{data.summary.bestOver.band} · {data.summary.bestOver.action}</div>
+                </div>
+                <div className="bg-[#141414] border border-red-500/30 rounded-xl p-3">
+                  <div className="text-xs text-gray-500 mb-1">Melhor UNDER</div>
+                  <div className="text-lg font-bold text-red-400">
+                    {data.summary.bestUnder.game} — {data.summary.bestUnder.pUnder.toFixed(1)}%
+                  </div>
+                  <div className="text-xs text-gray-500">{data.summary.bestUnder.band} · {data.summary.bestUnder.action}</div>
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-4">
-              {data.sinais.map((s, i) => (
-                <SignalCard key={i} s={s} />
-              ))}
+              {data.analysis
+                .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
+                .map((item, i) => (
+                  <SignalCard key={i} item={item} />
+                ))}
             </div>
           </>
+        )}
+
+        {data && (!data.analysis || data.analysis.length === 0) && (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">🔍</div>
+            <h2 className="text-xl text-gray-400 mb-2">Nenhum dado disponível</h2>
+            <p className="text-gray-600 max-w-md mx-auto">
+              O analista não encontrou colunas com sinal significativo no momento.
+            </p>
+          </div>
         )}
       </div>
 
       {/* Footer */}
       <footer className="border-t border-[#1f1f1f] px-4 py-3 flex items-center gap-4 text-xs text-gray-600">
-        <span>⚙️ RSI(14) · Bollinger(20,2) · VWAP(50) · MACD(12,26,9)</span>
+        <span>⚙️ Vertical · Heat · Lateral · Z-Score · Ponderado</span>
         <span className="ml-auto">DarkOdds v2.0 · Bet365 Virtual</span>
       </footer>
     </div>

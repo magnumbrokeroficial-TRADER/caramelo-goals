@@ -11,36 +11,38 @@ export default function Dashboard() {
   const [virtualData, setVirtualData] = useState<any>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       try {
-        // Carrega dados do sinal e virtual API em paralelo
+        const cacheBust = '?t=' + Date.now();
         const [signalsRes, virtualRes] = await Promise.all([
-          fetch('/api/signals'),
-          fetch('/api/virtual'),
+          fetch('/api/signals' + cacheBust, { cache: 'no-store' }),
+          fetch('/api/virtual' + cacheBust, { cache: 'no-store' }),
         ]);
 
         const signalsData = await signalsRes.json();
         const virtualData = virtualRes.ok ? await virtualRes.json() : null;
+        if (cancelled) return;
 
-        // Constrói série temporal
-        const startTime = Math.floor(Date.now() / 1000) - (signalsData.serie_over25?.length || 76) * 240;
-        const chartData = (signalsData.serie_over25 || []).map((v: number, i: number) => ({
-          time: startTime + i * 240,
-          value: v,
+        // Constrói série temporal a partir dos sinais (pOver por coluna)
+        const signals = signalsData.signals || [];
+        const startTime = Math.floor(Date.now() / 1000);
+        const chartData = signals.map((s: any, i: number) => ({
+          time: (startTime + i * 240) as any,
+          value: s.pOver ?? s.pUnder ?? 50,
         }));
 
         setDados(chartData);
         setVirtualData(virtualData);
         setLoading(false);
-      } catch {
-        setLoading(false);
+      } catch (e) {
+        console.error('fetch failed', e);
+        if (!cancelled) setLoading(false);
       }
     }
     load();
-
-    // Polling a cada 30s
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
+    const id = setInterval(load, 30_000);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   const leagues = virtualData?.leagues || {};

@@ -116,11 +116,11 @@
     var curH = now.getHours();
     var prevH = (curH - 1 + 24) % 24;
 
-    return '<div id="' + WRAP_ID + '" style="padding:10px 12px 8px;border-top:1px solid #222;background:#0d0d1a;font-family:monospace;">' +
-      '<div style="display:flex;gap:12px;">' +
-      // === LEFT: GAUGE (70%) ===
-      '<div style="flex:7;min-width:0;">' +
-      '<svg viewBox="0 0 400 280" width="100%" style="display:block;">' +
+    return '<div id="' + WRAP_ID + '" style="padding:10px 14px 10px;border-top:1px solid #222;background:#0d0d1a;font-family:monospace;">' +
+      '<div style="display:flex;gap:16px;">' +
+      // === LEFT: GAUGE (60%) ===
+      '<div style="flex:6;display:flex;justify-content:center;height:220px;overflow:hidden;">' +
+      '<svg viewBox="0 0 400 280" style="display:block;height:220px;width:auto;max-width:100%;">' +
       zoneSvg +
       tickSvg +
       // Needle line
@@ -129,21 +129,21 @@
       '<circle cx="' + cx + '" cy="' + cy + '" r="5" fill="#e0e0e0"/>' +
       '<circle cx="' + cx + '" cy="' + cy + '" r="2" fill="#0d0d1a"/>' +
       // Value text
-      '<text x="' + cx + '" y="' + (cy + r * 0.52) + '" text-anchor="middle" fill="#fff" font-size="36" font-weight="bold" font-family="monospace">' + valueTxt + '</text>' +
+      '<text x="' + cx + '" y="' + (cy + r * 0.52) + '" text-anchor="middle" fill="#fff" font-size="28" font-weight="bold" font-family="monospace">' + valueTxt + '</text>' +
       // Zone label
       '<text x="' + cx + '" y="' + (cy + r * 0.52 + 22) + '" text-anchor="middle" fill="#e0e0e0" font-size="12" font-weight="600" font-family="monospace">' + zone.phase + '</text>' +
       // Subtitle
       '<text x="' + cx + '" y="' + (cy + r * 0.52 + 38) + '" text-anchor="middle" fill="#888" font-size="9" font-family="monospace">' + zone.sub + '</text>' +
       '</svg>' +
       '</div>' +
-      // === RIGHT: SUMMARY (30%) ===
-      '<div style="flex:3;min-width:140px;padding:6px 0 0 4px;">' +
-      '<div style="font-size:10px;font-weight:600;color:#8b95b1;margin-bottom:8px;text-transform:uppercase;">Resumo do Ciclo Atual</div>' +
+      // === RIGHT: SUMMARY (40%) ===
+      '<div style="flex:4;min-width:140px;padding:4px 0 0 4px;">' +
+      '<div style="font-size:10px;font-weight:600;color:#8b95b1;margin-bottom:6px;text-transform:uppercase;">Resumo do Ciclo Atual</div>' +
       '<div class="di-summary-row"><span style="color:#26c281;">↑</span> <span style="color:#888;font-size:10px;">MÁX DELTA</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.max + '</span></div>' +
-      '<div class="di-summary-row" style="margin-top:6px;"><span style="color:#ef4444;">↓</span> <span style="color:#888;font-size:10px;">MÍN DELTA</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.min + '</span></div>' +
-      '<div class="di-summary-row" style="margin-top:6px;"><span style="color:#f1c40f;">~</span> <span style="color:#888;font-size:10px;">MÉDIA DELTA</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.avg.toFixed(1) + '</span></div>' +
-      '<div class="di-summary-row" style="margin-top:6px;"><span style="color:#8b95b1;">⊙</span> <span style="color:#888;font-size:10px;">JOGOS ANALISADOS</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.expansao + '/' + stats.total + '</span></div>' +
-      '<div class="di-summary-row" style="margin-top:8px;padding-top:6px;border-top:1px solid #222;">' +
+      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#ef4444;">↓</span> <span style="color:#888;font-size:10px;">MÍN DELTA</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.min + '</span></div>' +
+      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#f1c40f;">~</span> <span style="color:#888;font-size:10px;">MÉDIA DELTA</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.avg.toFixed(1) + '</span></div>' +
+      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#8b95b1;">⊙</span> <span style="color:#888;font-size:10px;">JOGOS ANALISADOS</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.expansao + '/' + stats.total + '</span></div>' +
+      '<div class="di-summary-row" style="margin-top:6px;padding-top:5px;border-top:1px solid #222;">' +
       '<span style="color:#888;font-size:10px;">TENDÊNCIA GERAL</span><br>' +
       '<span style="font-size:11px;font-weight:700;color:' + (stats.sum > 0 ? '#26c281' : stats.sum < 0 ? '#ef4444' : '#8b95b1') + ';">' +
       (stats.sum > 0 ? '▲ ' : stats.sum < 0 ? '▼ ' : '◆ ') +
@@ -167,7 +167,7 @@
     var mg = document.getElementById('mosaicGridLive');
     if (mg && mg.parentNode) {
       mg.parentNode.insertAdjacentHTML('beforeend',
-        '<div id="' + WRAP_ID + '" style="padding:20px 12px;border-top:1px solid #222;background:#0d0d1a;text-align:center;font-family:monospace;font-size:11px;color:#555;">' +
+        '<div id="' + WRAP_ID + '" style="padding:20px 14px;border-top:1px solid #222;background:#0d0d1a;text-align:center;font-family:monospace;font-size:11px;color:#555;">' +
         '⏳ Aguardando dados para gerar o gauge de fluxo de gols...</div>');
     }
   }

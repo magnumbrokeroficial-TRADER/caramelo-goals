@@ -1067,32 +1067,52 @@ function refreshMarkers() {
     });
   }
 
-  // 🎯 Ciclo: fase atual + transições (sempre visíveis)
+  // 🎯 Ciclo: sinal mais forte + resumo (sempre visíveis)
   if (App.analystData && App.data && App.data.length > 0) {
     const d = App.analystData;
-    const faseCor = { compressao:'#3B8BD4', aceleracao:'#EF9F27', explosao:'#E24B4A', explosao_forte:'#A32D2D' }[d.fase_atual] || '#888';
     const lastIdx = App.data.length - 1;
-    toShow.push({
-      time: App.data[lastIdx].time,
-      position: 'belowBar',
-      color: faseCor,
-      shape: 'arrowUp',
-      size: 0,
-      text: `● ${(d.fase_atual||'').replace(/_/g,' ').toUpperCase()}  SINAL: ${(d.sinal||'').toUpperCase()} ${Math.round((d.confianca||0)*100)}%`,
-    });
-    if (d.historico_horas && d.historico_horas.length > 1) {
-      for (let i = 1; i < d.historico_horas.length; i++) {
-        if (d.historico_horas[i].fase === d.historico_horas[i-1].fase) continue;
-        const ratio = i / d.historico_horas.length;
-        const idx = Math.min(Math.floor(ratio * App.data.length), App.data.length - 1);
-        toShow.push({
-          time: App.data[idx].time,
-          position: 'aboveBar',
-          color: 'rgba(255,255,255,0.05)',
-          shape: 'square',
-          size: 0,
-          text: d.historico_horas[i].fase.substring(0, 4).toUpperCase(),
-        });
+    // Formato novo (colunas) ou legado (fase_atual)
+    if (d.analysis && d.analysis.length > 0) {
+      // Deriva direção dominante das colunas
+      const overs = d.analysis.filter((a: any) => a.pOver >= 55).length;
+      const unders = d.analysis.filter((a: any) => a.pUnder >= 55).length;
+      const isOver = overs > unders;
+      const best = d.summary?.[isOver ? 'bestOver' : 'bestUnder'];
+      const pct = best ? (isOver ? best.pOver : best.pUnder) : 50;
+      const cor = pct >= 65 ? (isOver ? '#26c281' : '#ef4444') : '#facc15';
+      toShow.push({
+        time: App.data[lastIdx].time,
+        position: 'belowBar',
+        color: cor,
+        shape: 'arrowUp',
+        size: 0,
+        text: `${isOver ? '▲ OVER' : '▼ UNDER'} ${pct.toFixed(1)}%  (${d.summary?.strongSignals||0} sinais fortes)`,
+      });
+    } else if (d.fase_atual) {
+      // Formato legado
+      const faseCor = { compressao:'#3B8BD4', aceleracao:'#EF9F27', explosao:'#E24B4A', explosao_forte:'#A32D2D' }[d.fase_atual] || '#888';
+      toShow.push({
+        time: App.data[lastIdx].time,
+        position: 'belowBar',
+        color: faseCor,
+        shape: 'arrowUp',
+        size: 0,
+        text: `● ${d.fase_atual.replace(/_/g,' ').toUpperCase()}  SINAL: ${(d.sinal||'').toUpperCase()} ${Math.round((d.confianca||0)*100)}%`,
+      });
+      if (d.historico_horas && d.historico_horas.length > 1) {
+        for (let i = 1; i < d.historico_horas.length; i++) {
+          if (d.historico_horas[i].fase === d.historico_horas[i-1].fase) continue;
+          const ratio = i / d.historico_horas.length;
+          const idx = Math.min(Math.floor(ratio * App.data.length), App.data.length - 1);
+          toShow.push({
+            time: App.data[idx].time,
+            position: 'aboveBar',
+            color: 'rgba(255,255,255,0.05)',
+            shape: 'square',
+            size: 0,
+            text: d.historico_horas[i].fase.substring(0, 4).toUpperCase(),
+          });
+        }
       }
     }
   }
@@ -1273,6 +1293,7 @@ function updateTransitionLines() {
   App.series.transitionLines = [];
 
   const hist = App.analystData?.historico_horas;
+  // Só desenha transições no formato legado (com historico_horas)
   if (!hist || hist.length < 2 || !App.data || !App.charts.main) return;
 
   const maxVal = Math.max(...App.data.map(d => d.value), 80);
