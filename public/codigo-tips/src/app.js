@@ -1074,8 +1074,8 @@ function refreshMarkers() {
     // Formato novo (colunas) ou legado (fase_atual)
     if (d.analysis && d.analysis.length > 0) {
       // Deriva direção dominante das colunas
-      const overs = d.analysis.filter((a: any) => a.pOver >= 55).length;
-      const unders = d.analysis.filter((a: any) => a.pUnder >= 55).length;
+      const overs = d.analysis.filter((a) => a.pOver >= 55).length;
+      const unders = d.analysis.filter((a) => a.pUnder >= 55).length;
       const isOver = overs > unders;
       const best = d.summary?.[isOver ? 'bestOver' : 'bestUnder'];
       const pct = best ? (isOver ? best.pOver : best.pUnder) : 50;

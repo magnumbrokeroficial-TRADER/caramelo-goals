@@ -29,15 +29,20 @@
     var prev = m.slice(BLOCK_SIZE, BLOCK_SIZE * 2);
     var deltas = [];
     for (var i = 0; i < BLOCK_SIZE; i++) {
-      deltas.push(getScoreTotal(cur[i]) - getScoreTotal(prev[i]));
+      // Pula jogos que ainda não começaram (score='—')
+      // Caso contrário delta = 0 - prev_score (negativo artificial)
+      if (cur[i] && cur[i].score && cur[i].score !== '—') {
+        deltas.push(getScoreTotal(cur[i]) - getScoreTotal(prev[i]));
+      }
     }
+    var count = deltas.length || 1; // evita divisão por zero
     var sum = deltas.reduce(function (a, b) { return a + b; }, 0);
-    var max = Math.max.apply(null, deltas);
-    var min = Math.min.apply(null, deltas);
-    var avg = (sum / BLOCK_SIZE);
+    var max = deltas.length > 0 ? Math.max.apply(null, deltas) : 0;
+    var min = deltas.length > 0 ? Math.min.apply(null, deltas) : 0;
+    var avg = (sum / count);
     var exp = deltas.filter(function (d) { return d > 0; }).length;
     var con = deltas.filter(function (d) { return d < 0; }).length;
-    return { deltas: deltas, sum: sum, max: max, min: min, avg: avg, expansao: exp, contracao: con, total: BLOCK_SIZE };
+    return { deltas: deltas, sum: sum, max: max, min: min, avg: avg, expansao: exp, contracao: con, total: count };
   }
 
   function getZoneInfo(v) {
