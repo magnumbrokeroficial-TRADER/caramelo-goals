@@ -29,9 +29,34 @@
     return { total: total, overs: overs, pct: pct, count: vals.length };
   }
 
+  function injectMosaicCSS() {
+    if (document.getElementById('mosaic-responsive-css')) return;
+    var el = document.createElement('style');
+    el.id = 'mosaic-responsive-css';
+    el.textContent =
+      '.mosaic-table-wrap{-webkit-overflow-scrolling:touch;}' +
+      '.mosaic-table-wrap::-webkit-scrollbar{height:6px;}' +
+      '.mosaic-table-wrap::-webkit-scrollbar-track{background:#2a2a2a;}' +
+      '.mosaic-table-wrap::-webkit-scrollbar-thumb{background:#555;border-radius:3px;}' +
+      '@media(max-width:1023px){' +
+      '.mosaic-clone td,.mosaic-clone th{padding:3px 2px!important;font-size:11px!important;}' +
+      '.mosaic-clone td div[style*="font-size:18px"]{font-size:14px!important;}' +
+      '}' +
+      '@media(max-width:767px){' +
+      '.mosaic-clone{min-width:900px!important;font-size:10px!important;}' +
+      '.mosaic-clone td,.mosaic-clone th{padding:2px 1px!important;}' +
+      '.mosaic-clone td div[style*="font-size:18px"]{font-size:12px!important;}' +
+      '.mosaic-clone td div[style*="font-size:10px"]{display:none!important;}' +
+      '.mosaic-table-wrap::after{content:"← Deslize →";display:block;text-align:center;color:#666;font-size:11px;padding:4px;font-family:monospace;}' +
+      '}';
+    document.head.appendChild(el);
+  }
+
   function renderMosaic(matches) {
     var container = document.getElementById('mosaicGridLive');
     if (!container) return;
+
+    injectMosaicCSS();
 
     if (!matches || !matches.length) {
       container.innerHTML = '<div style="padding:16px;color:#555;font-family:monospace;font-size:11px;">⬛ Nenhum jogo</div>';
@@ -65,7 +90,7 @@
     var h = '';
 
     h += '<div class="mosaic-table-wrap" style="overflow-x:auto;background:#333;border-radius:8px;border:1px solid #555;">';
-    h += '<table class="mosaic-clone" style="width:100%;border-collapse:collapse;font-size:13px;font-family:system-ui,-apple-system,sans-serif;">';
+    h += '<table class="mosaic-clone" style="min-width:1280px;border-collapse:collapse;font-size:13px;font-family:system-ui,-apple-system,sans-serif;">';
 
     // Colgroup
     h += '<colgroup><col style="width:38px">';
@@ -109,8 +134,8 @@
       var sep = (ci > 0 && ci % 4 === 0) ? 'border-left:2.5px solid #888;' : '';
       h += '<td style="background:#1f2129;text-align:center;padding:6px 2px;border:1px solid #555;font-size:13.5px;font-weight:700;color:#fff;line-height:1.3;' + sep + '">' + MINUTE_LABELS[ci] + '</td>';
     }
-    h += '<td style="background:#1f2129;text-align:center;padding:6px 2px;border:1px solid #555;color:#9ca3af;font-weight:600;font-size:13px;">％</td>';
-    h += '<td style="background:#1f2129;text-align:center;padding:6px 2px;border:1px solid #555;color:#9ca3af;font-weight:600;font-size:13px;">G⚽</td>';
+    h += '<td style="background:#1f2129;text-align:center;padding:6px 2px;border:1px solid #555;color:#9ca3af;font-weight:600;font-size:13px;position:sticky;right:48px;z-index:8;">％</td>';
+    h += '<td style="background:#1f2129;text-align:center;padding:6px 2px;border:1px solid #555;color:#9ca3af;font-weight:600;font-size:13px;position:sticky;right:0;z-index:8;">G⚽</td>';
     h += '</tr>';
     h += '</thead>';
 
@@ -196,10 +221,10 @@
       }
 
       // Right aggregates
-      h += '<td style="background:#1f2129;text-align:center;padding:4px 2px;border:1px solid #555;font-size:13px;line-height:1.3;color:#e5e7eb;">';
+      h += '<td style="background:#1f2129;text-align:center;padding:4px 2px;border:1px solid #555;font-size:13px;line-height:1.3;color:#e5e7eb;position:sticky;right:48px;z-index:3;">';
       h += '<span style="' + (rowPct !== null && rowPct >= 50 ? 'color:#1fcc59;font-weight:600;' : (rowPct !== null && rowPct < 50 ? 'color:#ef4444;' : '')) + '">' + (rowPct !== null ? rowPct + '%' : '-') + '</span>';
       h += '</td>';
-      h += '<td style="background:#1f2129;text-align:center;padding:4px 2px;border:1px solid #555;font-size:13px;line-height:1.3;">';
+      h += '<td style="background:#1f2129;text-align:center;padding:4px 2px;border:1px solid #555;font-size:13px;line-height:1.3;position:sticky;right:0;z-index:3;">';
       h += '<div style="color:' + totalColor + ';font-weight:700;">' + rowTotal + '</div>';
       h += '<div style="color:#9ca3af;font-size:11px;">' + rowOvers +'</div>';
       h += '</td>';
