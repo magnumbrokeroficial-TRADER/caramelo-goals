@@ -533,7 +533,7 @@
 
     // 1. Top bar
     h += '<div class="df-topbar">';
-    h += '<span class="df-title">Δ Flow <span style="font-weight:400;opacity:0.6;">· sistema de sinais</span></span>';
+    h += '<span class="df-title">GoalDrift <span style="font-weight:400;opacity:0.6;">· sistema de sinais</span></span>';
     h += '<span class="df-badge-live">🔴 AO VIVO</span>';
     h += '<span class="df-spacer"></span>';
     h += '<span class="df-interval-group">';
@@ -668,7 +668,7 @@
       var direction = isOverFav ? 'OVER' : isUnderFav ? 'UNDER' : 'NEUTRO';
       var sigColor = isOverFav ? '#26c281' : isUnderFav ? '#ef4444' : '#8b95b1';
       h += '<div class="df-match-signal">';
-      h += '<div class="df-signal-text">Delta Flow indica: <span style="color:' + sigColor + ';font-weight:700;">' + arrow + ' ' + direction + '</span> para este jogo</div>';
+      h += '<div class="df-signal-text">GoalDrift indica: <span style="color:' + sigColor + ';font-weight:700;">' + arrow + ' ' + direction + '</span> para este jogo</div>';
       h += '<div class="df-signal-regime" style="color:' + rColor + ';">Regime: ' + regime.charAt(0).toUpperCase() + regime.slice(1) + '</div>';
       h += '</div>';
     } else {

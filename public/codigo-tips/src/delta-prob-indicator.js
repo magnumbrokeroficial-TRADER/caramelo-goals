@@ -86,7 +86,7 @@
       var ox = cx + or2 * Math.cos(rad), oy = cy + or2 * Math.sin(rad);
       var lx = cx + lr * Math.cos(rad), ly = cy + lr * Math.sin(rad);
       tickSvg += '<line x1="' + ix.toFixed(1) + '" y1="' + iy.toFixed(1) + '" x2="' + ox.toFixed(1) + '" y2="' + oy.toFixed(1) + '" stroke="#666" stroke-width="1"/>';
-      tickSvg += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 3).toFixed(1) + '" text-anchor="middle" fill="#777" font-size="8" font-family="monospace">' + v + '</text>';
+      tickSvg += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 3).toFixed(1) + '" text-anchor="middle" fill="#777" font-size="14" font-weight="600" font-family="monospace">' + v + '</text>';
     });
 
     // Sub-ticks at every 10
@@ -134,31 +134,31 @@
       '<circle cx="' + cx + '" cy="' + cy + '" r="5" fill="#e0e0e0"/>' +
       '<circle cx="' + cx + '" cy="' + cy + '" r="2" fill="#0d0d1a"/>' +
       // Value text
-      '<text x="' + cx + '" y="' + (cy + r * 0.52) + '" text-anchor="middle" fill="#fff" font-size="28" font-weight="bold" font-family="monospace">' + valueTxt + '</text>' +
+      '<text x="' + cx + '" y="' + (cy + r * 0.52) + '" text-anchor="middle" fill="#fff" font-size="48" font-weight="bold" font-family="monospace">' + valueTxt + '</text>' +
       // Zone label
-      '<text x="' + cx + '" y="' + (cy + r * 0.52 + 22) + '" text-anchor="middle" fill="#e0e0e0" font-size="12" font-weight="600" font-family="monospace">' + zone.phase + '</text>' +
+      '<text x="' + cx + '" y="' + (cy + r * 0.52 + 22) + '" text-anchor="middle" fill="#e0e0e0" font-size="16" font-weight="700" font-family="monospace">' + zone.phase + '</text>' +
       // Subtitle
-      '<text x="' + cx + '" y="' + (cy + r * 0.52 + 38) + '" text-anchor="middle" fill="#888" font-size="9" font-family="monospace">' + zone.sub + '</text>' +
+      '<text x="' + cx + '" y="' + (cy + r * 0.52 + 42) + '" text-anchor="middle" fill="#888" font-size="12" font-family="monospace">' + zone.sub + '</text>' +
       '</svg>' +
       '</div>' +
       // === RIGHT: SUMMARY (40%) ===
       '<div style="flex:4;min-width:140px;padding:4px 0 0 4px;">' +
-      '<div style="font-size:10px;font-weight:600;color:#8b95b1;margin-bottom:6px;text-transform:uppercase;">Resumo do Ciclo Atual</div>' +
-      '<div class="di-summary-row"><span style="color:#26c281;">↑</span> <span style="color:#888;font-size:10px;">MÁX DELTA</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.max + '</span></div>' +
-      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#ef4444;">↓</span> <span style="color:#888;font-size:10px;">MÍN DELTA</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.min + '</span></div>' +
-      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#f1c40f;">~</span> <span style="color:#888;font-size:10px;">MÉDIA DELTA</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.avg.toFixed(1) + '</span></div>' +
-      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#8b95b1;">⊙</span> <span style="color:#888;font-size:10px;">JOGOS ANALISADOS</span><br><span style="color:#e0e0e0;font-size:13px;font-weight:700;">' + stats.expansao + '/' + stats.total + '</span></div>' +
+      '<div style="font-size:14px;font-weight:700;color:#8b95b1;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Resumo do Ciclo Atual</div>' +
+      '<div class="di-summary-row"><span style="color:#26c281;font-size:13px;">↑</span> <span style="color:#888;font-size:12px;font-weight:600;">MÁX DELTA</span><br><span style="color:#e0e0e0;font-size:22px;font-weight:700;">' + stats.max + '</span></div>' +
+      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#ef4444;font-size:13px;">↓</span> <span style="color:#888;font-size:12px;font-weight:600;">MÍN DELTA</span><br><span style="color:#e0e0e0;font-size:22px;font-weight:700;">' + stats.min + '</span></div>' +
+      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#f1c40f;font-size:13px;">~</span> <span style="color:#888;font-size:12px;font-weight:600;">MÉDIA DELTA</span><br><span style="color:#e0e0e0;font-size:22px;font-weight:700;">' + stats.avg.toFixed(1) + '</span></div>' +
+      '<div class="di-summary-row" style="margin-top:5px;"><span style="color:#8b95b1;font-size:13px;">⊙</span> <span style="color:#888;font-size:12px;font-weight:600;">JOGOS ANALISADOS</span><br><span style="color:#e0e0e0;font-size:16px;font-weight:700;">' + stats.expansao + '/' + stats.total + '</span></div>' +
       '<div class="di-summary-row" style="margin-top:6px;padding-top:5px;border-top:1px solid #222;">' +
-      '<span style="color:#888;font-size:10px;">TENDÊNCIA GERAL</span><br>' +
-      '<span style="font-size:11px;font-weight:700;color:' + (stats.sum > 0 ? '#26c281' : stats.sum < 0 ? '#ef4444' : '#8b95b1') + ';">' +
+      '<span style="color:#8b95b1;font-size:12px;font-weight:600;">TENDÊNCIA GERAL</span><br>' +
+      '<span style="font-size:16px;font-weight:700;color:' + (stats.sum > 0 ? '#26c281' : stats.sum < 0 ? '#ef4444' : '#8b95b1') + ';">' +
       (stats.sum > 0 ? '▲ ' : stats.sum < 0 ? '▼ ' : '◆ ') +
       (stats.sum > 0 ? 'OVER' : stats.sum < 0 ? 'UNDER' : 'NEUTRO') + '</span><br>' +
-      '<span style="color:#555;font-size:9px;">' + (stats.sum > 0 ? 'Expansão dominante' : stats.sum < 0 ? 'Contração dominante' : 'Equilíbrio') + '</span>' +
+      '<span style="color:#555;font-size:12px;">' + (stats.sum > 0 ? 'Expansão dominante' : stats.sum < 0 ? 'Contração dominante' : 'Equilíbrio') + '</span>' +
       '</div>' +
       '</div>' +
       '</div>' +
       // === FOOTER ===
-      '<div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid #1a1a2e;font-size:9px;color:#555;">' +
+      '<div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid #1a1a2e;font-size:11px;color:#555;">' +
       '<span>Última atualização: ' + hh + ':' + mm + ':' + ss + '</span>' +
       '<span>Ciclo atual: ' + curH + 'h · Anterior: ' + prevH + 'h</span>' +
       '<span>Baseado no delta de gols por coluna (J1 → J20)</span>' +

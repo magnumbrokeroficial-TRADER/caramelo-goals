@@ -96,11 +96,11 @@ const REGIME_BANNER: Record<Regime, { icon: string; title: string; subtitle: str
 };
 
 const REGIME_DESCRIPTION: Record<Regime, string> = {
-  expansao:   'Delta Flow em expansão: mais de 60% dos deltas são positivos e o momentum acumulado ultrapassou +3. Cenário favorável para overs com entrada estruturada.',
-  aceleracao: 'Delta Flow em aceleração: a inclinação dos últimos 5 deltas está acima de +2, indicando que a pressão compradora está aumentando rapidamente. Ideal para overs de entrada rápida.',
-  contracao:  'Delta Flow em contração: mais de 60% dos deltas são negativos com momentum abaixo de -3. Cenário de under predominante, evitar overs.',
-  exaustao:   'Delta Flow em exaustão: a inclinação dos últimos 5 deltas está abaixo de -2, sugerindo que o movimento está perdendo força. Possível reversão no horizonte.',
-  neutro:     'Delta Flow neutro: deltas equilibrados sem direção clara. Aguardar 3 ou mais deltas consecutivos na mesma direção antes de qualquer entrada.',
+  expansao:   'GoalDrift em expansão: mais de 60% dos deltas são positivos e o momentum acumulado ultrapassou +3. Cenário favorável para overs com entrada estruturada.',
+  aceleracao: 'GoalDrift em aceleração: a inclinação dos últimos 5 deltas está acima de +2, indicando que a pressão compradora está aumentando rapidamente. Ideal para overs de entrada rápida.',
+  contracao:  'GoalDrift em contração: mais de 60% dos deltas são negativos com momentum abaixo de -3. Cenário de under predominante, evitar overs.',
+  exaustao:   'GoalDrift em exaustão: a inclinação dos últimos 5 deltas está abaixo de -2, sugerindo que o movimento está perdendo força. Possível reversão no horizonte.',
+  neutro:     'GoalDrift neutro: deltas equilibrados sem direção clara. Aguardar 3 ou mais deltas consecutivos na mesma direção antes de qualquer entrada.',
 };
 
 // ==============================
@@ -225,7 +225,7 @@ export default function DeltaFlowPanel() {
       {/* ===== TOP BAR ===== */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
         <h1 style={{ fontSize: '14px', fontWeight: 700, color: '#ffb547', margin: 0 }}>
-          Delta Flow <span style={{ color: '#666', fontWeight: 400, fontSize: '11px' }}>· sistema de sinais</span>
+          GoalDrift <span style={{ color: '#666', fontWeight: 400, fontSize: '11px' }}>· sistema de sinais</span>
         </h1>
         <span style={{ background: '#cc0000', color: '#fff', fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '3px', letterSpacing: '1px' }}>AO VIVO</span>
         <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
