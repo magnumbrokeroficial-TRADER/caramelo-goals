@@ -11,7 +11,8 @@ const App = {
   currentMarket: 'copa',
   currentRule: 'over25',  // mercado de aposta selecionado para o mosaico
   mosaicHours: 24,       // período do mosaico (3, 6, 8, 12, 18, 24)
-  qtdJogos: 360,         // jogos visíveis no zoom inicial
+  hoursMap: { 3: 60, 6: 120, 8: 160, 12: 240, 18: 360, 24: 480 },  // horas → jogos (20/hora)
+  qtdJogos: 480,         // jogos visíveis no zoom inicial (default 24h × 20)
   data: null,           // pontos atuais do mercado selecionado
   state: null,          // indicadores calculados
   signals: [],          // todos os sinais detectados
@@ -78,6 +79,9 @@ async function loadAndRender(marketKey) {
     App.analystData = data;
     if (App.charts.main) updateCycleChart();
   });
+
+  // Sinais V/Heat/Lat/Z + GoalDrift — envia pra caixa de sinais
+  fetchAndPushAllSignals(marketKey);
 
   const values = App.data.map(d => d.value);
   App.state = calculateAllIndicators(values, cfg);
@@ -642,6 +646,125 @@ function renderHistoryPanel() {
 }
 
 /* ============================================================
+   🔥 SINAIS V/Heat/Lat/Z — GoalDrift Signal Box
+   ============================================================ */
+
+async function fetchAndPushAllSignals(liga) {
+  try {
+    // 1. Fetch V/Heat/Lat/Z do Next.js proxy
+    const sigRes = await fetch('/api/signals?t=' + Date.now());
+    const sigData = sigRes.ok ? await sigRes.json() : null;
+
+    // 2. Fetch analyst data (GoalDrift)
+    const analystData = await fetchAnalyst(liga);
+
+    // 3. Push to signal box
+    pushToSignalBox(sigData, analystData);
+  } catch (e) {
+    console.warn('[Signals] erro:', e.message);
+  }
+}
+
+function pushToSignalBox(sigData, analystData) {
+  var el = document.getElementById('goaldriftSignals');
+  if (!el) return;
+
+  var signals = sigData && sigData.signals ? sigData.signals : [];
+  var analystTop = analystData && analystData.analysis ? analystData.analysis : [];
+
+  if (signals.length === 0 && analystTop.length === 0) {
+    el.innerHTML = '<div style="padding:20px;color:var(--text-muted);font-size:12px;text-align:center">Sem sinais no momento.</div>';
+    return;
+  }
+
+  var h = '';
+
+  // V/Heat/Lat/Z signals
+  if (signals.length > 0) {
+    h += '<div class="signals-box-label" style="font-size:10px;color:#8b95b1;padding:4px 8px;text-transform:uppercase;letter-spacing:0.3px;">V/Heat/Lat/Z</div>';
+    signals.slice(0, 5).forEach(function (sig) {
+      var isOver = sig.direction === 'OVER';
+      var pct = isOver ? sig.pOver : sig.pUnder;
+      var dirColor = isOver ? 'var(--green)' : 'var(--red)';
+      var arrow = isOver ? '▲' : '▼';
+      var comps = sig.components || {};
+      var compStr = 'V:' + (comps.vertical || '-') + ' H:' + (comps.heat || '-') + ' L:' + (comps.lateral || '-') + ' Z:' + (comps.z || '-');
+
+      h += '<div class="signal-card ' + (isOver ? 'over' : 'under') + '" style="cursor:default;">';
+      h += '  <div class="signal-card-top">';
+      h += '    <span class="signal-pattern" style="color:' + dirColor + ';">' + arrow + ' ' + sig.game + ' · ' + sig.time + '</span>';
+      h += '    <span class="signal-time" style="color:' + dirColor + ';font-weight:700;">' + pct.toFixed(1) + '%</span>';
+      h += '  </div>';
+      h += '  <div class="signal-msg">' + sig.band + ' · alvo: ' + sig.oddsTarget + ' · ' + sig.confidence + '</div>';
+      if (comps.vertical !== undefined) {
+        h += '  <div style="font-size:10px;color:#666;padding:2px 8px 0;">' + compStr + '</div>';
+      }
+      // Telegram button
+      h += '  <div style="padding:2px 8px 4px;">';
+      h += '    <button class="sg-telegram-btn" onclick="sendToTelegram(\'' + sig.game + ' ' + sig.direction + ' ' + pct.toFixed(1) + '% · ' + sig.band + '\')" style="background:transparent;border:1px solid #333;color:#8b95b1;border-radius:3px;padding:1px 8px;font-size:9px;cursor:pointer;font-family:monospace;">📤 Telegram</button>';
+      h += '  </div>';
+      h += '</div>';
+    });
+  }
+
+  // GoalDrift analyst signals (top columns)
+  if (analystTop.length > 0) {
+    h += '<div class="signals-box-label" style="font-size:10px;color:#8b95b1;padding:4px 8px 0;text-transform:uppercase;letter-spacing:0.3px;margin-top:4px;">GoalDrift</div>';
+    analystTop.slice(0, 3).forEach(function (a) {
+      var isOver = a.pOver >= 50;
+      var pct = isOver ? a.pOver : a.pUnder;
+      var dirColor = isOver ? 'var(--green)' : 'var(--red)';
+      var arrow = isOver ? '▲' : '▼';
+
+      h += '<div class="signal-card ' + (isOver ? 'over' : 'under') + '" style="cursor:default;">';
+      h += '  <div class="signal-card-top">';
+      h += '    <span class="signal-pattern" style="color:' + dirColor + ';">' + arrow + ' ' + a.game + ' · ' + a.time + '</span>';
+      h += '    <span class="signal-time" style="color:' + dirColor + ';font-weight:700;">' + pct.toFixed(1) + '%</span>';
+      h += '  </div>';
+      h += '  <div class="signal-msg">Score: ' + (a.score || '-') + '</div>';
+      h += '  <div style="padding:2px 8px 4px;">';
+      h += '    <button class="sg-telegram-btn" onclick="sendToTelegram(\'GoalDrift: ' + a.game + ' ' + (isOver ? 'OVER' : 'UNDER') + ' ' + pct.toFixed(1) + '%\')" style="background:transparent;border:1px solid #333;color:#8b95b1;border-radius:3px;padding:1px 8px;font-size:9px;cursor:pointer;font-family:monospace;">📤 Telegram</button>';
+      h += '  </div>';
+      h += '</div>';
+    });
+  }
+
+  // Regime summary from analystData
+  if (analystData && analystData.summary) {
+    var sum = analystData.summary;
+    var bestOver = sum.bestOver;
+    var bestUnder = sum.bestUnder;
+    if (bestOver || bestUnder) {
+      h += '<div style="font-size:10px;color:#555;padding:6px 8px 4px;border-top:1px solid #1a1a2e;">';
+      if (bestOver) h += '<span style="color:#26c281;">▲ OVER:</span> ' + bestOver.game + ' ' + bestOver.pOver.toFixed(1) + '%<br>';
+      if (bestUnder) h += '<span style="color:#ef4444;">▼ UNDER:</span> ' + bestUnder.game + ' ' + bestUnder.pUnder.toFixed(1) + '%';
+      h += '</div>';
+    }
+  }
+
+  el.innerHTML = h;
+}
+
+// Telegram share (global para onclick)
+window.sendToTelegram = function (text) {
+  var cfg = NotifConfig ? NotifConfig.get() : null;
+  var token = cfg ? cfg.telegram.token : '';
+  var chatId = cfg ? cfg.telegram.chatId : '';
+  if (!token || !chatId) {
+    alert('Configure Telegram nas notificações primeiro (🔔 Alertas)');
+    return;
+  }
+  var msg = '🎯 *Sinal CODIGO.TIPS*\n' + text + '\n\n🤖 Gerado em: ' + new Date().toLocaleString('pt-BR');
+  sendTelegram(token, chatId, msg).then(function (result) {
+    var status = document.getElementById('tgStatus');
+    if (status) {
+      status.textContent = result.msg;
+      status.className = 'notify-status ' + (result.ok ? 'ok' : 'err');
+    }
+  });
+};
+
+/* ============================================================
    🌍 BARRA UTC — sincronizada com o eixo X do gráfico principal
    ============================================================
    Usa timeToCoordinate() pra alinhar cada tick UTC exatamente
@@ -803,10 +926,14 @@ function setupEventListeners() {
     loadAndRender(App.currentMarket);
   });
 
-  // Dropdown de horas do mosaico
+  // Dropdown de horas do mosaico — atualiza o select de qtd jogos e recarrega
   document.getElementById('mosaicHoursSelect')?.addEventListener('change', e => {
     App.mosaicHours = parseInt(e.target.value);
     e.target.value = App.mosaicHours;
+    // Sincroniza o Qtd. Jogos com as horas selecionadas
+    App.qtdJogos = App.hoursMap[App.mosaicHours] || 480;
+    const qtdEl = document.getElementById('qtdJogosSelect');
+    if (qtdEl) qtdEl.value = App.qtdJogos;
     renderMosaicGrid();
   });
 
@@ -990,22 +1117,33 @@ async function updateCurrentMatchPanel() {
 }
 
 function startLiveSimulation() {
-  // Atualiza painel de partidas e recarrega dados reais a cada 60s
-  setInterval(async () => {
-    // 1. Atualiza painel de partidas (leve, só match info)
+  var _fullTick = 0;
+
+  async function refreshAll() {
+    _fullTick++;
+
+    // 1. Match panel (sempre, leve)
     await updateCurrentMatchPanel();
 
-    // 2. Recarrega dados completos do mercado (gráfico + indicadores)
+    // 2. Sinais V/Heat/Lat/Z (sempre, leve)
+    fetchAndPushAllSignals(App.currentMarket);
+
+    // 3. Full reload a cada 5 ticks (~10min com intervalo de 120s)
+    if (_fullTick % 5 !== 0) return;
     if (App._loading) return;
     App._loading = true;
     try {
       await loadAndRender(App.currentMarket);
     } catch (e) {
-      console.warn('[startLiveSimulation]', e.message);
+      console.warn('[refreshAll]', e.message);
     } finally {
       App._loading = false;
     }
-  }, 600000);
+  }
+
+  // Toda chamada agendada a 120s
+  refreshAll(); // primeira imediata
+  setInterval(refreshAll, 120000);
 }
 
 // ============================================================
