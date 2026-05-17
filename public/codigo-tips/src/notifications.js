@@ -43,6 +43,9 @@ async function enableBrowserPush() {
   if (!('Notification' in window)) {
     return { ok: false, msg: 'Navegador não suporta notificações' };
   }
+  if (Notification.permission === 'denied') {
+    return { ok: false, msg: 'Notificações bloqueadas pelo navegador' };
+  }
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
     const cfg = NotifConfig.get();

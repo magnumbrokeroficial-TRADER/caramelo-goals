@@ -1002,10 +1002,12 @@ function setupEventListeners() {
 
   // Browser push
   document.getElementById('btnEnablePush').addEventListener('click', async () => {
+    if (Notification.permission === 'denied') return;
     const result = await enableBrowserPush();
     const status = document.getElementById('pushStatus');
     status.textContent = `Status: ${result.msg}`;
     status.className = `notify-status ${result.ok ? 'ok' : 'err'}`;
+    loadNotifyForm();
   });
 
   // Telegram teste
@@ -1078,8 +1080,22 @@ function loadNotifyForm() {
   document.getElementById('notifyMinConfVal').textContent = cfg.filters.minConfidence;
   document.getElementById('notifyOver').checked = cfg.filters.over;
   document.getElementById('notifyUnder').checked = cfg.filters.under;
-  document.getElementById('pushStatus').textContent = `Status: ${cfg.pushEnabled ? 'ativado' : 'desativado'}`;
-  document.getElementById('pushStatus').className = `notify-status ${cfg.pushEnabled ? 'ok' : ''}`;
+
+  const isDenied = 'Notification' in window && Notification.permission === 'denied';
+  const btn = document.getElementById('btnEnablePush');
+  const statusEl = document.getElementById('pushStatus');
+
+  if (isDenied) {
+    btn.disabled = true;
+    btn.textContent = 'Notificações bloqueadas pelo navegador';
+    statusEl.textContent = 'Para ativar: clique no cadeado na barra de endereço → Notificações → Permitir';
+    statusEl.className = 'notify-status err';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Ativar Notificações';
+    statusEl.textContent = `Status: ${cfg.pushEnabled ? 'ativado' : 'desativado'}`;
+    statusEl.className = `notify-status ${cfg.pushEnabled ? 'ok' : ''}`;
+  }
 }
 
 function saveNotifyForm() {
